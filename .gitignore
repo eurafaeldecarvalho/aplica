@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# a instância do usuário fica no config dir do SO, nunca aqui
+engine/**/__pycache__/
