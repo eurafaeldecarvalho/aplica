@@ -21,7 +21,7 @@ ashby|Silver
 # --- Acrescentar novos slugs abaixo desta linha ---
 #
 # === Ampliação 2026-10-04 (slugs validados na API; o scanner filtra cargo/stack/geografia) ===
-# -- Com vaga no perfil do Rafael no dia da validação --
+# -- Com vaga no perfil-alvo no dia da validação --
 greenhouse|coinbase
 greenhouse|twilio
 greenhouse|gitlab
