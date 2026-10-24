@@ -41,6 +41,9 @@ STACK_FORA = {k: _rx(v) for k, v in (_T.get("stack_out") or {}).items() if _rx(v
 LOCAL_OK = _rx_words(_T.get("geo_allow"))
 LOCAL_RUIM = _rx_words(_T.get("geo_block"))
 
+# --- empresas/recrutadores barrados (blocklist do usuário) ---
+COMPANY_BLOCK = _rx_words(_T.get("company_block"))
+
 # --- idioma ---
 LINGUA_BLOQUEIO = _rx(_T.get("language_required_block"))
 
@@ -64,6 +67,13 @@ def titulo_passa(titulo):
     if TITULO_OK and not TITULO_OK.search(t):
         return False
     if TITULO_RUIM and TITULO_RUIM.search(t):
+        return False
+    return True
+
+
+def empresa_passa(empresa):
+    """False se a empresa/recrutador está na blocklist do usuário (target.company_block)."""
+    if COMPANY_BLOCK and COMPANY_BLOCK.search(empresa or ""):
         return False
     return True
 
@@ -110,29 +120,37 @@ def knockout_descricao(texto, local=""):
     return None
 
 
-def nota_fit(titulo, local, idade_dias=None, texto=""):
-    """Nota 0–100 (mesma escala do ats-scan)."""
+def nota_fit_detalhe(titulo, local, idade_dias=None, texto=""):
+    """(nota 0–100, [motivos]) — o porquê da nota, para transparência (nada de caixa-preta)."""
     t, l = titulo or "", local or ""
-    s = 0
+    s, reasons = 0, []
     if STACK_ALVO and STACK_ALVO.search(t):
-        s += 45
+        s += 45; reasons.append("+45 stack-alvo no título")
     elif TITULO_OK and TITULO_OK.search(t):
-        s += 35
+        s += 35; reasons.append("+35 título compatível")
     else:
-        s += 30  # baseline quando não há perfil configurado
+        s += 30; reasons.append("+30 baseline (sem perfil configurado)")
     if texto and STACK_ALVO and STACK_ALVO.search(texto) and not STACK_ALVO.search(t):
-        s += 5
+        s += 5; reasons.append("+5 stack-alvo na descrição")
     if GEO_MUNDO.search(l):
-        s += 30
+        s += 30; reasons.append("+30 worldwide/global")
     elif GEO_AMERICAS.search(l) or (LOCAL_OK and LOCAL_OK.search(l)):
-        s += 25
+        s += 25; reasons.append("+25 mercado-alvo")
     elif re.search(r"remote|remoto", l, re.I):
-        s += 15
-    s += 10 if (SENIOR.search(t) or PLENO.search(t)) else 5
+        s += 15; reasons.append("+15 remoto")
+    if SENIOR.search(t) or PLENO.search(t):
+        s += 10; reasons.append("+10 senioridade")
+    else:
+        s += 5
     if idade_dias is None:
         s += 8
     elif idade_dias <= 14:
-        s += 15
+        s += 15; reasons.append("+15 vaga recente (<14d)")
     elif idade_dias <= 30:
         s += 8
-    return min(s, 100)
+    return min(s, 100), reasons
+
+
+def nota_fit(titulo, local, idade_dias=None, texto=""):
+    """Nota 0–100 (mesma escala do ats-scan)."""
+    return nota_fit_detalhe(titulo, local, idade_dias, texto)[0]

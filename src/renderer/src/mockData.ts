@@ -9,6 +9,7 @@ export const DEFAULT_CONFIG = {
     stack_out: { java: '\\bjava\\b(?!script)', go: '\\bgolang\\b', '.net': '\\.net\\b|c#' },
     geo_allow: ['remote', 'worldwide', 'latam', 'brazil', 'usa'],
     geo_block: ['india', 'poland'],
+    company_block: [],
     work_language: ['english', 'portuguese'],
     language_required_block: '',
     home_city: '',
@@ -22,7 +23,7 @@ export const DEFAULT_CONFIG = {
   caps: {
     applications_per_day: 15, max_batches: 10, batch_size: 5,
     social_per_day: 0, interest_per_day: 0, interest_cooldown_days: 180,
-    post_interval_days: 7, cadence_seconds: [45, 240]
+    post_interval_days: 7, cadence_seconds: [45, 240], active_hours: { start: '', end: '' }
   },
   sources: { ats: true, linkedin_jobs: true, remotive: true, freehire: true, linkedin_feed: false },
   schedule: {

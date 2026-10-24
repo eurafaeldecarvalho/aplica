@@ -198,8 +198,8 @@ def _caps():
 
 
 def _empregador_atual():
-    """Lista de slugs do empregador atual (nunca sinalizar interesse nele)."""
-    return [slug(e) for e in config.load_config().get("current_employer", []) if e]
+    """Formas normalizadas (só letras/números) do empregador atual (nunca sinalizar interesse nele)."""
+    return [re.sub(r"[^a-z0-9]", "", slug(e)) for e in config.load_config().get("current_employer", []) if e]
 
 
 # ---------- normalização ----------
@@ -599,7 +599,8 @@ def cmd_interesse_check(a):
     cooldown_dias = int(_caps().get("interest_cooldown_days", 180))
     empregador = _empregador_atual()
     emp = slug(a.empresa)
-    if any(e in emp.replace("-", " ") or e in emp.replace("-", "") for e in empregador):
+    emp_alnum = re.sub(r"[^a-z0-9]", "", emp)
+    if any(e and e in emp_alnum for e in empregador):
         print("NAO empregador-atual")
         return
     n = con.execute("SELECT COUNT(*) FROM contatos WHERE direcao='enviado' AND canal='linkedin-interesse' AND data=?",
@@ -713,7 +714,8 @@ def cmd_interesse_pendentes(a):
     vistos, n = set(), 0
     for r in rows:
         emp = slug(r["empresa"])
-        if emp in feitas or emp in vistos or any(e in emp.replace("-", " ") or e in emp.replace("-", "") for e in empregador):
+        emp_alnum = re.sub(r"[^a-z0-9]", "", emp)
+        if emp in feitas or emp in vistos or any(e and e in emp_alnum for e in empregador):
             continue
         vistos.add(emp)
         print(f"{r['empresa']}	candidatura={r['id']}	fit={r['fit']}	{r['status']}	{r['data']}	{r['titulo']}")
@@ -930,6 +932,47 @@ def cmd_relatorio(a):
         print(f"- #{p['id']} {prazo}{p['descricao']}" + (f" — {p['url']}" if p["url"] else ""))
 
 
+RESPONDEU = ("em-processo", "entrevista", "oferta", "teste-pendente", "rejeitada")
+ENTREVISTOU = ("entrevista", "oferta")
+
+
+def cmd_metricas(a):
+    """Funil e taxa de resposta por fonte — só agrega o que já está no banco."""
+    con = conectar(somente_leitura=True)
+    rows = con.execute("SELECT fonte,status FROM candidaturas WHERE status<>'incerta'").fetchall()
+    total = len(rows)
+    agg = {}
+    for r in rows:
+        fonte = (r["fonte"] or "(sem fonte)").split(" ")[0]
+        d = agg.setdefault(fonte, {"n": 0, "resp": 0, "entr": 0})
+        d["n"] += 1
+        if r["status"] in RESPONDEU:
+            d["resp"] += 1
+        if r["status"] in ENTREVISTOU:
+            d["entr"] += 1
+    resp_tot = sum(1 for r in rows if r["status"] in RESPONDEU)
+    entr_tot = sum(1 for r in rows if r["status"] in ENTREVISTOU)
+    pct = lambda x, n: f"{(100 * x / n):.0f}%" if n else "—"
+    print(f"# Métricas — {total} candidaturas (exclui incertas)")
+    print(f"Taxa de resposta: {pct(resp_tot, total)} ({resp_tot}) | Taxa de entrevista: {pct(entr_tot, total)} ({entr_tot})\n")
+    print("fonte\tcandidaturas\trespostas\ttaxa_resp\tentrevistas\ttaxa_entr")
+    for fonte, d in sorted(agg.items(), key=lambda kv: -kv[1]["n"]):
+        print(f"{fonte}\t{d['n']}\t{d['resp']}\t{pct(d['resp'], d['n'])}\t{d['entr']}\t{pct(d['entr'], d['n'])}")
+
+
+def cmd_followups(a):
+    """Candidaturas aplicadas/sem-retorno há >= N dias (default 7) — para follow-up (o agente/você decide)."""
+    con = conectar(somente_leitura=True)
+    limite = (datetime.date.today() - datetime.timedelta(days=a.dias)).isoformat()
+    rows = con.execute(
+        "SELECT id,data,empresa,titulo,fonte,status,url FROM candidaturas "
+        "WHERE status IN ('aplicada','sem-retorno') AND data<=? ORDER BY data, id", (limite,)).fetchall()
+    if not rows:
+        print("(nenhuma)")
+        return
+    imprimir(rows)
+
+
 def cmd_sql(a):
     con = conectar(somente_leitura=True)
     try:
@@ -942,6 +985,17 @@ def cmd_export(a):
     con = conectar(somente_leitura=True)
     pasta = config.VISAO
     os.makedirs(pasta, exist_ok=True)
+    if getattr(a, "csv", False):
+        import csv
+        destino = os.path.join(pasta, "candidaturas.csv")
+        rows = con.execute("SELECT id,data,empresa,titulo,fonte,status,fit,url,obs FROM candidaturas ORDER BY data DESC, id DESC").fetchall()
+        with open(destino, "w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["id", "data", "empresa", "titulo", "fonte", "status", "fit", "url", "obs"])
+            for r in rows:
+                w.writerow([r[c] for c in ("id", "data", "empresa", "titulo", "fonte", "status", "fit", "url", "obs")])
+        print(f"OK {destino}")
+        return
     vistas = {
         "candidaturas.md": "SELECT data,empresa,titulo,fonte,status,fit,url,obs FROM candidaturas ORDER BY data DESC, id DESC",
         "pendencias.md": "SELECT id,data,prazo,descricao,url FROM pendencias WHERE status='aberta' ORDER BY COALESCE(prazo,'9999')",
@@ -1097,8 +1151,15 @@ def main():
     s = sp.add_parser("relatorio", help="resumo do dia em markdown (corpo do e-mail)")
     s.add_argument("--data"); s.set_defaults(f=cmd_relatorio)
 
+    s = sp.add_parser("metricas", help="funil e taxa de resposta/entrevista por fonte (só leitura)")
+    s.set_defaults(f=cmd_metricas)
+
+    s = sp.add_parser("followups", help="candidaturas aplicadas/sem-retorno há >= N dias (para follow-up)")
+    s.add_argument("--dias", type=int, default=7); s.set_defaults(f=cmd_followups)
+
     s = sp.add_parser("sql", help="consulta SOMENTE LEITURA"); s.add_argument("consulta"); s.set_defaults(f=cmd_sql)
-    sp.add_parser("export", help="gera visao/*.md legíveis (só leitura)").set_defaults(f=cmd_export)
+    s = sp.add_parser("export", help="gera visao/*.md legíveis (só leitura); --csv gera candidaturas.csv")
+    s.add_argument("--csv", action="store_true"); s.set_defaults(f=cmd_export)
 
     a = p.parse_args()
     if a.cmd == "pendencia" and a.acao == "add" and not a.descricao:

@@ -106,7 +106,7 @@ def main():
                 empty.append(c)
                 continue
             for ats, comp, title, loc, url, age in res:
-                if filtros.titulo_passa(title) and filtros.local_passa(loc):
+                if filtros.titulo_passa(title) and filtros.empresa_passa(comp) and filtros.local_passa(loc):
                     out.append((ats, comp, title, loc, url, age))
 
     seen, dedup_ledger, rows = set(), 0, []

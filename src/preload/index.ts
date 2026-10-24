@@ -18,6 +18,8 @@ const api = {
   dbReport: (date?: string) => ipcRenderer.invoke('db:report', date),
   dbToday: (date?: string) => ipcRenderer.invoke('db:today', date),
   dbStuck: () => ipcRenderer.invoke('db:stuck'),
+  dbMetrics: () => ipcRenderer.invoke('db:metrics'),
+  dbFollowups: (dias?: number) => ipcRenderer.invoke('db:followups', dias),
   dbBackup: () => ipcRenderer.invoke('db:backup'),
 
   // files & shell

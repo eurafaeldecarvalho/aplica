@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG = {
     stack_out: {},
     geo_allow: ['remote', 'remoto', 'worldwide', 'anywhere', 'global'],
     geo_block: [],
+    company_block: [],
     work_language: ['english', 'portuguese'],
     language_required_block: '',
     home_city: '',
@@ -32,7 +33,8 @@ export const DEFAULT_CONFIG = {
     interest_per_day: 0,
     interest_cooldown_days: 180,
     post_interval_days: 7,
-    cadence_seconds: [45, 240]
+    cadence_seconds: [45, 240],
+    active_hours: { start: '', end: '' }
   },
   sources: { ats: true, linkedin_jobs: true, remotive: true, freehire: true, linkedin_feed: false },
   schedule: {

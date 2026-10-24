@@ -5,6 +5,8 @@ export default function Dashboard(): JSX.Element {
   const [report, setReport] = React.useState('')
   const [today, setToday] = React.useState('')
   const [stuck, setStuck] = React.useState<{ travadas: string; pendencias: string } | null>(null)
+  const [metrics, setMetrics] = React.useState('')
+  const [followups, setFollowups] = React.useState('')
   const [err, setErr] = React.useState('')
   const [loading, setLoading] = React.useState(false)
 
@@ -15,10 +17,15 @@ export default function Dashboard(): JSX.Element {
       setErr('Banco não inicializado. Vá em Início → Inicializar banco.')
       setLoading(false); return
     }
-    const [r, t, s] = await Promise.all([window.aplica.dbReport(), window.aplica.dbToday(), window.aplica.dbStuck()])
+    const [r, t, s, m, f] = await Promise.all([
+      window.aplica.dbReport(), window.aplica.dbToday(), window.aplica.dbStuck(),
+      window.aplica.dbMetrics(), window.aplica.dbFollowups(7)
+    ])
     setReport(r.stdout || r.stderr)
     setToday(t.stdout || t.stderr)
     setStuck(s)
+    setMetrics(m.stdout || m.stderr)
+    setFollowups(f.stdout || f.stderr)
     setLoading(false)
   }, [])
 
@@ -43,8 +50,16 @@ export default function Dashboard(): JSX.Element {
 
       {err && <div className="banner warn">{err}</div>}
 
+      <Card title="Métricas — taxa de resposta por fonte">
+        <pre className="console">{metrics || '(sem dados)'}</pre>
+      </Card>
+
       <Card title="Resumo do dia">
         <pre className="console">{report || '(sem dados)'}</pre>
+      </Card>
+
+      <Card title="Follow-ups sugeridos (sem retorno há 7+ dias)">
+        <pre className="console">{followups || '(nenhum)'}</pre>
       </Card>
 
       {stuck && (

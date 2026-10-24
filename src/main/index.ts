@@ -140,6 +140,9 @@ function registerIpc(): void {
     runEngine(date ? ['relatorio', '--data', date] : ['relatorio']))
   ipcMain.handle('db:today', async (_e, date?: string) =>
     runEngine(date ? ['hoje', '--data', date] : ['hoje']))
+  ipcMain.handle('db:metrics', async () => runEngine(['metricas']))
+  ipcMain.handle('db:followups', async (_e, dias?: number) =>
+    runEngine(['followups', '--dias', String(dias ?? 7)]))
   ipcMain.handle('db:stuck', async () => {
     const trav = await runEngine(['travada', 'list'])
     const pend = await runEngine(['pendencia', 'list'])

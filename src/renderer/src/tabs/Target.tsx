@@ -35,6 +35,7 @@ export default function Target(props: { config: any; onSave: (c: any) => Promise
       <Card title="Geografia e idioma">
         <TagInput label="Mercados aceitos (geo_allow)" values={t.geo_allow || []} onChange={(v) => setT('geo_allow', v)} placeholder="ex. remote, latam, brazil, usa" />
         <TagInput label="Mercados barrados (geo_block)" values={t.geo_block || []} onChange={(v) => setT('geo_block', v)} placeholder="ex. india, poland" />
+        <TagInput label="Empresas/recrutadores barrados (company_block)" values={t.company_block || []} onChange={(v) => setT('company_block', v)} placeholder="ex. Evil Staffing" />
         <TagInput label="Idiomas de trabalho" values={t.work_language || []} onChange={(v) => setT('work_language', v)} placeholder="ex. english, portuguese" />
         <Field label="Idioma obrigatório que elimina (regex, opcional)" value={t.language_required_block || ''} onChange={(v) => setT('language_required_block', v)} />
         <Field label="Sua cidade (presencial/híbrido só vale aqui)" value={t.home_city || ''} onChange={(v) => setT('home_city', v)} />

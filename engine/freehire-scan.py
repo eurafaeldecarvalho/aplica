@@ -48,6 +48,8 @@ def avaliar(j):
     titulo, local = j.get("title") or "", j.get("location") or ""
     if not filtros.titulo_passa(titulo):
         return False, "título"
+    if not filtros.empresa_passa(j.get("company") or ""):
+        return False, "empresa-bloqueada"
     if not filtros.local_passa(local):
         return False, "local"
     enr = j.get("enrichment") or {}

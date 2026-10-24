@@ -64,7 +64,10 @@ export default function Behavior(props: { config: any; onSave: (c: any) => Promi
         <div className="grid">
           <Field label="Cadência mín (s)" type="number" value={(caps.cadence_seconds || [45, 240])[0]} onChange={(v) => setCap('cadence_seconds', [Number(v) || 0, (caps.cadence_seconds || [45, 240])[1]] as any)} />
           <Field label="Cadência máx (s)" type="number" value={(caps.cadence_seconds || [45, 240])[1]} onChange={(v) => setCap('cadence_seconds', [(caps.cadence_seconds || [45, 240])[0], Number(v) || 0] as any)} />
+          <Field label="Horário ativo — início (HH:MM, opcional)" value={caps.active_hours?.start || ''} onChange={(v) => setCap('active_hours', { ...(caps.active_hours || {}), start: v } as any)} />
+          <Field label="Horário ativo — fim (HH:MM, opcional)" value={caps.active_hours?.end || ''} onChange={(v) => setCap('active_hours', { ...(caps.active_hours || {}), end: v } as any)} />
         </div>
+        <p className="hint">Horário ativo vazio = sem restrição. Preenchido, o agente evita agir fora da janela (parece mais humano).</p>
       </Card>
 
       <SaveBar onSave={save} saved={saved} />
