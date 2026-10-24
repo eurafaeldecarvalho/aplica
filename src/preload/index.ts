@@ -28,6 +28,8 @@ const api = {
 
   // routine run (stream)
   runRoutine: (source: string) => ipcRenderer.invoke('routine:run', source),
+  stopRoutine: () => ipcRenderer.invoke('routine:stop'),
+  isRunning: () => ipcRenderer.invoke('routine:running'),
   onRoutineOutput: (cb: (chunk: string) => void) => {
     const handler = (_e: unknown, chunk: string): void => cb(chunk)
     ipcRenderer.on('routine:output', handler)

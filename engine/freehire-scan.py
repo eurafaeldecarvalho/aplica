@@ -12,9 +12,9 @@ import filtros, jobdb
 import config
 
 BASE = os.environ.get("FREEHIRE_API_URL", "https://freehire.me")
-_T = config.load_config().get("target", {})
+_T = config.load_config().get("target") or {}
 # termos de busca: primeiras palavras dos títulos-alvo, minúsculas, deduplicadas
-BUSCAS = _T.get("freehire_queries") or [s.split()[-1].lower() for s in (_T.get("titles_search") or ["developer"]) if s][:4] or ["developer"]
+BUSCAS = _T.get("freehire_queries") or [s.split()[-1].lower() for s in (_T.get("titles_search") or ["developer"]) if s.split()][:4] or ["developer"]
 # skills-alvo: extrai palavras alfanuméricas do regex stack_target do config
 ALVO_SKILLS = {w.lower() for w in re.findall(r"[a-zA-Z][a-zA-Z0-9.]+", _T.get("stack_target") or "") if len(w) > 1}
 IDIOMAS_OK = {l[:2].lower() for l in (_T.get("work_language") or ["english", "portuguese"])} | {None, ""}
@@ -27,12 +27,17 @@ def busca(params):
     for tentativa in range(3):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "aplica/1.0"}), timeout=30) as r:
-                return json.load(r)
+                try:
+                    return json.load(r)
+                except ValueError as e:
+                    # resposta não-JSON (HTML de WAF/erro com status 200) → fonte indisponível, não crash
+                    raise ConnectionError(f"freehire respondeu não-JSON: {e}") from e
         except urllib.error.HTTPError as e:
             if e.code == 429 or e.code >= 500:
                 time.sleep(5 * (tentativa + 1))
                 continue
-            raise
+            # 4xx (403/404/etc.) não é recuperável → trata como fonte indisponível (exit 4), não exit 1
+            raise ConnectionError(f"freehire HTTP {e.code}: {url[:120]}") from e
         except (urllib.error.URLError, TimeoutError):
             time.sleep(5 * (tentativa + 1))
     raise ConnectionError(f"freehire indisponível: {url[:120]}")

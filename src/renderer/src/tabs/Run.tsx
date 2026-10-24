@@ -24,11 +24,19 @@ export default function Run(props: { config: any }): JSX.Element {
     return off
   }, [])
 
+  React.useEffect(() => {
+    window.aplica.isRunning().then((s: any) => setRunning(!!s?.running))
+  }, [])
+
   const run = async (): Promise<void> => {
     setOutput(''); setRunning(true)
     const r = await window.aplica.runRoutine(source)
     if (!r.ok) setOutput((o) => o + `\n[erro] ${r.error}\n`)
     setRunning(false)
+  }
+
+  const stop = async (): Promise<void> => {
+    await window.aplica.stopRoutine()
   }
 
   const feedWarn = source === 'feed' && props.config?.behavior?.feed_mode === 'off'
@@ -55,6 +63,7 @@ export default function Run(props: { config: any }): JSX.Element {
         {feedWarn && <div className="banner warn" style={{ marginTop: 0 }}>O feed está em modo <strong>off</strong> no Comportamento; essa rotina não fará nada.</div>}
         <div className="btn-row">
           <button className="btn" onClick={run} disabled={running}>{running ? 'Rodando…' : 'Rodar'}</button>
+          {running && <button className="btn secondary" onClick={stop}>Parar</button>}
         </div>
       </Card>
 

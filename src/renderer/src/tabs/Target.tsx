@@ -8,9 +8,9 @@ export default function Target(props: { config: any; onSave: (c: any) => Promise
   const [saved, setSaved] = React.useState(false)
   const t = c.target || {}
 
-  const setT = (k: string, v: any): void => { const n = clone(c); n.target = { ...n.target, [k]: v }; setC(n); setSaved(false) }
-  const setMode = (k: string, v: boolean): void => { const n = clone(c); n.target.work_modes = { ...n.target.work_modes, [k]: v }; setC(n); setSaved(false) }
-  const setSource = (k: string, v: boolean): void => { const n = clone(c); n.sources = { ...n.sources, [k]: v }; setC(n); setSaved(false) }
+  const setT = (k: string, v: any): void => { const n = clone(c); n.target = { ...(n.target || {}), [k]: v }; setC(n); setSaved(false) }
+  const setMode = (k: string, v: boolean): void => { const n = clone(c); const base = n.target || (n.target = {}); base.work_modes = { ...(base.work_modes || {}), [k]: v }; setC(n); setSaved(false) }
+  const setSource = (k: string, v: boolean): void => { const n = clone(c); n.sources = { ...(n.sources || {}), [k]: v }; setC(n); setSaved(false) }
 
   const save = async (): Promise<void> => { await props.onSave(c); setSaved(true) }
 

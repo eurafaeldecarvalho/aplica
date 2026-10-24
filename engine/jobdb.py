@@ -400,6 +400,7 @@ def cmd_add_candidatura(a):
             sys.exit(2)
         if not a.motivo_force:
             erro("--force exige --motivo-force explicando por que é outra vaga", 2)
+    _barra_segredo(a.obs)
     cur = con.execute(
         "INSERT INTO candidaturas (data,empresa,titulo,fonte,url,url_norm,chave,status,fit,obs) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (a.data or hoje(), a.empresa, a.titulo or "", a.fonte, a.url, norm_url(a.url),
@@ -425,6 +426,7 @@ def cmd_update_candidatura(a):
     status = a.status or r["status"]
     if status not in STATUS_CAND:
         erro(f"status inválido: {status}")
+    _barra_segredo(a.obs_append)
     obs = r["obs"] or ""
     if a.obs_append:
         obs = (obs + "\n" if obs else "") + f"[{hoje()}] {a.obs_append}"
@@ -469,6 +471,7 @@ def cmd_hoje(a):
 
 
 def cmd_add_pergunta(a):
+    _barra_segredo(a.pergunta, a.resposta_agente)
     con = conectar()
     pn = slug(a.pergunta)
     r = con.execute("SELECT id,empresa_vaga FROM perguntas WHERE pergunta_norm=?", (pn,)).fetchone()
@@ -498,8 +501,10 @@ def cmd_perguntas(a):
 
 def cmd_responder_pergunta(a):
     con = conectar()
-    con.execute("UPDATE perguntas SET resposta_oficial=?, status='respondida' WHERE id=?", (a.resposta, a.id))
+    n = con.execute("UPDATE perguntas SET resposta_oficial=?, status='respondida' WHERE id=?", (a.resposta, a.id)).rowcount
     con.commit()
+    if not n:
+        erro(f"pergunta id={a.id} não existe")
     print(f"OK pergunta id={a.id} respondida")
 
 
@@ -525,9 +530,11 @@ def cmd_update_site(a):
     if a.status and a.status not in STATUS_SITE:
         erro(f"status inválido: {a.status}")
     con = conectar()
-    con.execute("UPDATE sites_bloqueados SET status=COALESCE(?,status), resolucao=COALESCE(?,resolucao), atualizado_em=datetime('now','localtime') WHERE id=?",
-                (a.status, a.resolucao, a.id))
+    n = con.execute("UPDATE sites_bloqueados SET status=COALESCE(?,status), resolucao=COALESCE(?,resolucao), atualizado_em=datetime('now','localtime') WHERE id=?",
+                    (a.status, a.resolucao, a.id)).rowcount
     con.commit()
+    if not n:
+        erro(f"site id={a.id} não existe")
     print(f"OK site id={a.id}")
 
 
@@ -556,6 +563,7 @@ def cmd_sites_ativos(a):
 def cmd_add_contato(a):
     if a.canal not in CANAIS:
         erro(f"canal inválido: {a.canal} (válidos: {', '.join(CANAIS)})")
+    _barra_segredo(a.resumo)
     con = conectar()
     cur = con.execute("INSERT INTO contatos (data,pessoa,pessoa_norm,empresa,canal,direcao,resumo,candidatura_id) VALUES (?,?,?,?,?,?,?,?)",
                       (a.data or hoje(), a.pessoa, slug(a.pessoa), a.empresa, a.canal, a.direcao, a.resumo, a.candidatura_id))
@@ -804,6 +812,7 @@ def cmd_controle(a):
 
 
 def cmd_log(a):
+    _barra_segredo(a.texto)
     con = conectar()
     con.execute("INSERT INTO sessao_log (data_rodada,tipo,texto) VALUES (?,?,?)", (a.data_rodada or hoje(), a.tipo, a.texto))
     con.commit()
@@ -818,6 +827,7 @@ def cmd_logs(a):
 def cmd_pendencia(a):
     con = conectar()
     if a.acao == "add":
+        _barra_segredo(a.descricao)
         abertas = con.execute("SELECT id,descricao,url FROM pendencias WHERE status='aberta'").fetchall()
         un = norm_url(a.url)
         for p in abertas:
@@ -836,7 +846,32 @@ def cmd_pendencia(a):
         imprimir(con.execute("SELECT id,data,prazo,descricao,url FROM pendencias WHERE status='aberta' ORDER BY COALESCE(prazo,'9999'), id"))
 
 
-PARECE_DOC = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
+# Guarda anti-segredo: nunca gravar no banco o VALOR de documento, cartão ou senha — só a
+# descrição do campo. Rede de segurança (defesa em profundidade); o agente já é instruído a nunca
+# gravar segredos. Aplicada a todo campo de texto livre no ponto de escrita.
+PARECE_DOC = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")          # CPF
+PARECE_CARTAO = re.compile(r"\b(?:\d[ -]?){13,19}\b")                 # cartão / sequência longa de dígitos
+PARECE_SENHA = re.compile(r"\b(senha|password|passwd|pwd|secret|token)\b\s*[:=]\s*\S+", re.I)
+
+
+def _segredo_em(*campos):
+    """Devolve o motivo se algum campo parece conter um segredo, senão None."""
+    for c in campos:
+        if not c:
+            continue
+        if PARECE_DOC.search(c):
+            return "número de documento (ex.: CPF)"
+        if PARECE_CARTAO.search(c):
+            return "sequência longa de dígitos (cartão/documento)"
+        if PARECE_SENHA.search(c):
+            return "senha/token em texto plano"
+    return None
+
+
+def _barra_segredo(*campos):
+    m = _segredo_em(*campos)
+    if m:
+        erro(f"texto parece conter {m} — descreva o campo (ex.: \"CPF obrigatório\"), nunca grave o valor")
 
 
 def cmd_travada(a):
@@ -844,9 +879,7 @@ def cmd_travada(a):
     if a.acao == "add":
         if a.tipo not in TIPOS_TRAVADA:
             erro(f"tipo inválido: {a.tipo} (válidos: {', '.join(TIPOS_TRAVADA)})")
-        for campo in (a.campos, a.detalhe, a.obs, a.etapa):
-            if campo and PARECE_DOC.search(campo):
-                erro("texto parece conter um número de documento — descreva o campo (ex.: \"CPF obrigatório\"), nunca grave o número")
+        _barra_segredo(a.campos, a.detalhe, a.obs, a.etapa)
         un = norm_url(a.url)
         k = chave(a.empresa, a.titulo) if a.empresa else None
         r = None

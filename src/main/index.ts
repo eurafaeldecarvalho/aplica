@@ -1,14 +1,33 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { join, isAbsolute } from 'path'
 import { promises as fs } from 'fs'
-import { spawn, spawnSync } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import {
   configDir, configFile, profileFile, answersFile,
-  enginePath, jobdbScript, findPython, findClaude, fileExists
+  enginePath, jobdbScript, findPython, findClaude, fileExists, needsShell
 } from './paths'
 import { DEFAULT_CONFIG, BLANK_PROFILE } from './defaults'
 
 let mainWindow: BrowserWindow | null = null
+let runningRoutine: ChildProcess | null = null
+
+/** Merge recursivo (espelha engine/config.py _deep_merge): null do arquivo não sobrescreve default. */
+function deepMerge(base: any, over: any): any {
+  if (over === null || over === undefined) return base
+  if (typeof base !== 'object' || base === null || Array.isArray(base)) return over
+  const out: any = { ...base }
+  for (const [k, v] of Object.entries(over)) {
+    if (v === null || v === undefined) continue
+    out[k] = (typeof v === 'object' && !Array.isArray(v) && typeof base[k] === 'object' && !Array.isArray(base[k]))
+      ? deepMerge(base[k], v)
+      : v
+  }
+  return out
+}
+
+function resolveInConfig(rel: string): string {
+  return isAbsolute(rel) ? rel : join(configDir(), rel)
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -86,7 +105,8 @@ function registerIpc(): void {
 
   ipcMain.handle('config:read', async () => {
     if (!fileExists(configFile())) return { exists: false, data: DEFAULT_CONFIG }
-    return { exists: true, data: await readJson(configFile(), DEFAULT_CONFIG) }
+    const fileCfg = await readJson(configFile(), {})
+    return { exists: true, data: deepMerge(DEFAULT_CONFIG, fileCfg) }
   })
   ipcMain.handle('config:write', async (_e, data) => {
     await writeJson(configFile(), data)
@@ -96,7 +116,8 @@ function registerIpc(): void {
 
   ipcMain.handle('profile:read', async () => {
     if (!fileExists(profileFile())) return { exists: false, data: BLANK_PROFILE }
-    return { exists: true, data: await readJson(profileFile(), BLANK_PROFILE) }
+    const fileProfile = await readJson(profileFile(), {})
+    return { exists: true, data: deepMerge(BLANK_PROFILE, fileProfile) }
   })
   ipcMain.handle('profile:write', async (_e, data) => {
     await writeJson(profileFile(), data)
@@ -120,6 +141,8 @@ function registerIpc(): void {
   ipcMain.handle('prereqs:check', async () => {
     const py = findPython()
     const claude = findClaude()
+    const cfg = await readJson<any>(configFile(), DEFAULT_CONFIG)
+    const paths = cfg?.paths || {}
     return {
       python: !!py,
       pythonBin: py,
@@ -127,7 +150,8 @@ function registerIpc(): void {
       claudeBin: claude,
       configDir: configDir(),
       enginePresent: fileExists(jobdbScript()),
-      resumePresent: fileExists(join(configDir(), (await readJson<any>(configFile(), DEFAULT_CONFIG)).paths?.resume || 'resume.pdf')),
+      resumePresent: fileExists(resolveInConfig(paths.resume || 'resume.pdf')),
+      photoPresent: fileExists(resolveInConfig(paths.photo || 'photo.jpg')),
       configPresent: fileExists(configFile()),
       profilePresent: fileExists(profileFile())
     }
@@ -170,20 +194,30 @@ function registerIpc(): void {
   })
 
   // execução de rotina via claude -p (stream)
+  const SOURCES = new Set(['all', 'ats', 'linkedin', 'freehire', 'recruiters', 'feed'])
   ipcMain.handle('routine:run', async (e, source: string) => {
+    if (runningRoutine) return { ok: false, error: 'Já há uma execução em andamento.' }
     const claude = findClaude()
     if (!claude) return { ok: false, error: 'CLI `claude` não encontrado no PATH.' }
+    const src = SOURCES.has(source) ? source : 'all'
     const env = { ...process.env, APLICA_HOME: configDir() }
-    const prompt = `/aplica-run ${source || 'all'}`
-    const child = spawn(claude, ['-p', prompt], { env })
+    const prompt = `/aplica-run ${src}`
+    const child = spawn(claude, ['-p', prompt], { env, shell: needsShell() })
+    runningRoutine = child
     const send = (chunk: string): void => e.sender.send('routine:output', chunk)
-    child.stdout.on('data', (d) => send(d.toString()))
-    child.stderr.on('data', (d) => send(d.toString()))
+    child.stdout?.on('data', (d) => send(d.toString()))
+    child.stderr?.on('data', (d) => send(d.toString()))
     return await new Promise((resolve) => {
-      child.on('error', (err) => { send(`\n[erro] ${err}\n`); resolve({ ok: false, error: String(err) }) })
-      child.on('close', (code) => { send(`\n[execução terminou com código ${code}]\n`); resolve({ ok: true, code }) })
+      child.on('error', (err) => { runningRoutine = null; send(`\n[erro] ${err}\n`); resolve({ ok: false, error: String(err) }) })
+      child.on('close', (code) => { runningRoutine = null; send(`\n[execução terminou com código ${code}]\n`); resolve({ ok: true, code }) })
     })
   })
+  ipcMain.handle('routine:stop', async () => {
+    if (!runningRoutine) return { ok: false, error: 'nada em execução' }
+    runningRoutine.kill()
+    return { ok: true }
+  })
+  ipcMain.handle('routine:running', async () => ({ running: !!runningRoutine }))
 }
 
 app.whenReady().then(() => {

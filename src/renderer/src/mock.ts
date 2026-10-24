@@ -32,6 +32,8 @@ if (typeof window !== 'undefined' && !(window as any).aplica) {
     pickFile: async () => ({ ok: true, dest: '~/.config/aplica/resume.pdf' }),
     openConfigDir: async () => ({ ok: true }),
     runRoutine: async () => ({ ok: true, code: 0 }),
+    stopRoutine: async () => ({ ok: true }),
+    isRunning: async () => ({ running: false }),
     onRoutineOutput: (cb: (c: string) => void) => {
       const t = setTimeout(() => cb('[mock] execução de exemplo…\n[execução terminou com código 0]\n'), 400)
       return () => clearTimeout(t)

@@ -24,9 +24,19 @@ def main():
     ap.add_argument("--data", default=None, help="AAAA-MM-DD; default = hoje")
     args = ap.parse_args()
 
-    caps = config.load_config().get("caps", {})
-    teto_candidaturas = int(caps.get("applications_per_day", 15))
-    max_lotes = int(caps.get("max_batches", 10))
+    # A trava nunca pode dar traceback: config malformado falha-FECHADO (PARAR), nunca "open".
+    try:
+        caps = config.load_config().get("caps") or {}
+
+        def _cap_int(k, d):
+            v = caps.get(k, d)
+            return int(v) if v is not None else d
+
+        teto_candidaturas = _cap_int("applications_per_day", 15)
+        max_lotes = _cap_int("max_batches", 10)
+    except Exception as e:
+        print(f"PARAR:config-invalida ({e})")
+        return
 
     hoje = args.data or datetime.date.today().isoformat()
     try:

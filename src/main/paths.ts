@@ -60,13 +60,13 @@ export function findPython(): string | null {
 }
 
 let cachedClaude: string | null | undefined
-/** Acha o CLI `claude` no PATH. */
+/** Acha o CLI `claude` no PATH. No Windows é um .cmd, que exige shell no spawn (senão EINVAL). */
 export function findClaude(): string | null {
   if (cachedClaude !== undefined) return cachedClaude
-  const bin = process.platform === 'win32' ? 'claude.cmd' : 'claude'
-  for (const c of [bin, 'claude']) {
+  const win = process.platform === 'win32'
+  for (const c of win ? ['claude.cmd', 'claude'] : ['claude']) {
     try {
-      const r = spawnSync(c, ['--version'], { encoding: 'utf-8' })
+      const r = spawnSync(c, ['--version'], { encoding: 'utf-8', shell: win })
       if (r.status === 0) {
         cachedClaude = c
         return c
@@ -77,6 +77,11 @@ export function findClaude(): string | null {
   }
   cachedClaude = null
   return null
+}
+
+/** Se o spawn de processos .cmd (claude no Windows) precisa de shell. */
+export function needsShell(): boolean {
+  return process.platform === 'win32'
 }
 
 export function fileExists(p: string): boolean {

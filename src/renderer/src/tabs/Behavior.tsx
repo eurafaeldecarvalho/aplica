@@ -9,9 +9,9 @@ export default function Behavior(props: { config: any; onSave: (c: any) => Promi
   const b = c.behavior || {}
   const caps = c.caps || {}
 
-  const setB = (k: string, v: any): void => { const n = clone(c); n.behavior = { ...n.behavior, [k]: v }; setC(n); setSaved(false) }
-  const setSocial = (k: string, v: boolean): void => { const n = clone(c); n.behavior.social = { ...n.behavior.social, [k]: v }; setC(n); setSaved(false) }
-  const setCap = (k: string, v: number): void => { const n = clone(c); n.caps = { ...n.caps, [k]: v }; setC(n); setSaved(false) }
+  const setB = (k: string, v: any): void => { const n = clone(c); n.behavior = { ...(n.behavior || {}), [k]: v }; setC(n); setSaved(false) }
+  const setSocial = (k: string, v: boolean): void => { const n = clone(c); const base = n.behavior || (n.behavior = {}); base.social = { ...(base.social || {}), [k]: v }; setC(n); setSaved(false) }
+  const setCap = (k: string, v: number): void => { const n = clone(c); n.caps = { ...(n.caps || {}), [k]: v }; setC(n); setSaved(false) }
 
   const save = async (): Promise<void> => { await props.onSave(c); setSaved(true) }
 
