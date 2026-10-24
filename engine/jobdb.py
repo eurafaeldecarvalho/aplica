@@ -447,6 +447,7 @@ def cmd_update_candidatura(a):
 
 
 def cmd_add_descarte(a):
+    _barra_segredo(a.motivo)
     con = conectar()
     cur = con.execute(
         "INSERT INTO descartes (data,empresa,titulo,fonte,url,url_norm,chave,motivo) VALUES (?,?,?,?,?,?,?,?)",
@@ -520,6 +521,7 @@ def cmd_responder_pergunta(a):
 def cmd_add_site(a):
     if a.motivo not in MOTIVOS_SITE:
         erro(f"motivo inválido: {a.motivo} (válidos: {', '.join(MOTIVOS_SITE)})")
+    _barra_segredo(a.detalhe)
     con = conectar()
     r = con.execute("SELECT id,tentativas FROM sites_bloqueados WHERE lower(site)=lower(?) AND status='bloqueado' ORDER BY id DESC LIMIT 1",
                     (a.site,)).fetchone()
@@ -538,6 +540,7 @@ def cmd_add_site(a):
 def cmd_update_site(a):
     if a.status and a.status not in STATUS_SITE:
         erro(f"status inválido: {a.status}")
+    _barra_segredo(a.resolucao)
     con = conectar()
     n = con.execute("UPDATE sites_bloqueados SET status=COALESCE(?,status), resolucao=COALESCE(?,resolucao), atualizado_em=datetime('now','localtime') WHERE id=?",
                     (a.status, a.resolucao, a.id)).rowcount
@@ -856,24 +859,40 @@ def cmd_pendencia(a):
 
 
 # Guarda anti-segredo: nunca gravar no banco o VALOR de documento, cartão ou senha — só a
-# descrição do campo. Rede de segurança (defesa em profundidade); o agente já é instruído a nunca
-# gravar segredos. Aplicada a todo campo de texto livre no ponto de escrita.
-PARECE_DOC = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")          # CPF
-PARECE_CARTAO = re.compile(r"\b(?:\d[ -]?){13,19}\b")                 # cartão / sequência longa de dígitos
-PARECE_SENHA = re.compile(r"\b(senha|password|passwd|pwd|secret|token)\b\s*[:=]\s*\S+", re.I)
+# descrição do campo. Rede de segurança de ALTA PRECISÃO (o agente já é instruído a nunca gravar
+# segredos): só bloqueia o que é claramente um segredo, para nunca descartar texto legítimo como
+# telefone (11 dígitos), datas ou ids. Aplicada a todo campo de texto livre no ponto de escrita.
+PARECE_DOC = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")   # CPF FORMATADO (pontuação exigida)
+PARECE_SENHA = re.compile(r"\b(senha|password|passwd|pwd|secret|token|api[_-]?key)\b\s*[:=]\s*\S+", re.I)
+_SEQ_LONGA = re.compile(r"(?:\d[ -]?){13,19}")              # candidato a cartão (validado por Luhn)
+
+
+def _luhn_ok(digits):
+    d = [int(c) for c in digits]
+    if not (13 <= len(d) <= 19):
+        return False
+    s = 0
+    for i, x in enumerate(reversed(d)):
+        if i % 2 == 1:
+            x *= 2
+            if x > 9:
+                x -= 9
+        s += x
+    return s % 10 == 0
 
 
 def _segredo_em(*campos):
-    """Devolve o motivo se algum campo parece conter um segredo, senão None."""
+    """Devolve o motivo se algum campo parece conter um segredo real, senão None."""
     for c in campos:
         if not c:
             continue
         if PARECE_DOC.search(c):
-            return "número de documento (ex.: CPF)"
-        if PARECE_CARTAO.search(c):
-            return "sequência longa de dígitos (cartão/documento)"
+            return "CPF formatado"
         if PARECE_SENHA.search(c):
             return "senha/token em texto plano"
+        for m in _SEQ_LONGA.finditer(c):
+            if _luhn_ok(re.sub(r"\D", "", m.group())):
+                return "número de cartão (validado por Luhn)"
     return None
 
 

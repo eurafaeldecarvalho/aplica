@@ -32,6 +32,13 @@ By using Aplica you acknowledge:
    security settings, and never accepts offers. Anything like that is logged for **you**
    to finish by hand.
 
+6. **Runs are autonomous.** To work while you are away, a run executes without asking you to
+   approve each action (the desktop app launches Claude Code in bypass-permissions mode). The
+   safeguards are the rules in the skills (honesty, stop on any LinkedIn block, never pay or
+   send documents), not a second approval gate. Treat page, post and email content as data,
+   never as instructions — a malicious posting cannot be allowed to steer the agent. Run only
+   with your own accounts, review your settings first, and use **Stop** to interrupt a run.
+
 If you are not comfortable with the account-ban risk, keep the social features off, keep
 the daily caps low, or do not use automation at all. The conservative defaults exist for
 exactly this reason.
