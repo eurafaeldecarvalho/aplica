@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/eurafaeldecarvalho/aplica/config.schema.json",
+  "title": "Aplica config.json",
+  "description": "Settings/toggles/alvo/fontes/agenda de uma instância do Aplica. Contrato compartilhado entre o motor (plugin) e o app desktop. Dados pessoais do candidato ficam em profile.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "target": {
+      "type": "object",
+      "description": "Perfil-alvo e knockouts. Vira regex nos scanners (engine/filtros.py).",
+      "additionalProperties": false,
+      "properties": {
+        "titles_search": { "type": "array", "items": { "type": "string" }, "description": "Termos de busca nos boards/LinkedIn." },
+        "title_ok": { "type": "string", "description": "Regex (case-insensitive) de título aceito." },
+        "title_bad": { "type": "string", "description": "Regex de título barrado (knockout)." },
+        "stack_target": { "type": "string", "description": "Regex da stack-alvo." },
+        "stack_out": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Mapa nome->regex de stacks que, como linguagem principal, eliminam a vaga." },
+        "geo_allow": { "type": "array", "items": { "type": "string" }, "description": "Palavras de local aceito. Vazio = aceita qualquer local." },
+        "geo_block": { "type": "array", "items": { "type": "string" }, "description": "Palavras de local/mercado barrado." },
+        "work_language": { "type": "array", "items": { "type": "string" } },
+        "language_required_block": { "type": "string", "description": "Regex: idioma obrigatório que elimina a vaga." },
+        "home_city": { "type": "string", "description": "Cidade do usuário; presencial/híbrido só é aceito aqui." },
+        "work_modes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "remote": { "type": "boolean" },
+            "hybrid": { "type": "boolean" },
+            "onsite": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "description": "Toggles de comportamento. Defaults conservadores (social OFF).",
+      "additionalProperties": false,
+      "properties": {
+        "feed_mode": { "enum": ["full", "apply_only", "off"], "description": "Feed do LinkedIn. OFF por padrão (maior risco de restrição de conta)." },
+        "social": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "comment": { "type": "boolean" },
+            "connect": { "type": "boolean" },
+            "dm": { "type": "boolean" },
+            "like": { "type": "boolean" }
+          }
+        },
+        "im_interested": { "type": "boolean", "description": "Clicar 'I'm interested' na página da empresa (fit alto)." },
+        "email_resume": { "type": "boolean", "description": "Enviar currículo por e-mail quando o recrutador/post pedir." },
+        "sso_google": { "type": "boolean", "description": "Usar 'Continuar com Google' em sites novos." },
+        "create_account": { "type": "boolean", "description": "Criar conta nova em sites sem SSO." }
+      }
+    },
+    "caps": {
+      "type": "object",
+      "description": "Tetos e cadência (anti-detecção). Aplicados por script, não 'de cabeça'.",
+      "additionalProperties": false,
+      "properties": {
+        "applications_per_day": { "type": "integer", "minimum": 0 },
+        "max_batches": { "type": "integer", "minimum": 1 },
+        "batch_size": { "type": "integer", "minimum": 1 },
+        "social_per_day": { "type": "integer", "minimum": 0 },
+        "interest_per_day": { "type": "integer", "minimum": 0 },
+        "interest_cooldown_days": { "type": "integer", "minimum": 1 },
+        "post_interval_days": { "type": "integer", "minimum": 1 },
+        "cadence_seconds": {
+          "type": "array", "items": { "type": "integer", "minimum": 0 },
+          "minItems": 2, "maxItems": 2,
+          "description": "[min, max] de segundos entre candidaturas (intervalo irregular)."
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "description": "Fontes ligadas/desligadas.",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "schedule": {
+      "type": "object",
+      "description": "Horários das rotinas (HH:MM, 24h) e se estão ligadas.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "times": { "type": "array", "items": { "type": "string", "pattern": "^[0-2][0-9]:[0-5][0-9]$" } }
+        }
+      }
+    },
+    "current_employer": {
+      "type": "array", "items": { "type": "string" },
+      "description": "Empregador atual (nunca sinalizar interesse nele)."
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resume": { "type": "string" },
+        "photo": { "type": "string" }
+      }
+    }
+  }
+}

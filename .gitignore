@@ -1,0 +1,35 @@
+# Aplica — nunca versionar dados do usuário nem artefatos locais.
+# A instância do usuário vive no config dir do SO (~/.config/aplica | %APPDATA%\aplica),
+# fora do repo. Estes padrões são uma rede de segurança caso alguém copie dados para cá.
+
+# dados do usuário / estado
+config.json
+profile.json
+answers.md
+state.db
+state.db-shm
+state.db-wal
+*.db
+*.db-wal
+*.db-shm
+backups/
+logs/
+tmp/
+visao/
+
+# currículo / foto / documentos pessoais
+resume.pdf
+photo.*
+*.pdf
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

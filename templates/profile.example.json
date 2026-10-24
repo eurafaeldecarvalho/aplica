@@ -1,0 +1,78 @@
+{
+  "_comment": "Exemplo de profile.json com dados ficticios. Copie para o seu config dir como profile.json e troque por dados REAIS e VERDADEIROS (a regra de honestidade do motor nunca inventa nem infla).",
+  "identity": {
+    "full_name": "Alex Doe",
+    "email": "alex.doe@example.com",
+    "phone_e164": "+15550001234",
+    "birth_date": "1990-01-01",
+    "national_id": "",
+    "nationality": "Brazilian"
+  },
+  "address": {
+    "line1": "123 Example St",
+    "city": "Curitiba",
+    "state": "PR",
+    "country": "Brazil",
+    "postal_code": "80000-000"
+  },
+  "links": {
+    "linkedin": "https://www.linkedin.com/in/alexdoe",
+    "github": "https://github.com/alexdoe",
+    "portfolio": "https://alexdoe.dev",
+    "other": []
+  },
+  "work_authorization": {
+    "authorized_countries": ["Brazil"],
+    "needs_sponsorship": false,
+    "disability": "prefer not to say",
+    "veteran": "no",
+    "contact_current_employer": false
+  },
+  "eeo": {
+    "gender": "prefer not to say",
+    "pronouns": "they/them",
+    "race": "prefer not to say",
+    "self_identification": ""
+  },
+  "preferences": {
+    "headline": "Senior Backend Engineer — Node.js, TypeScript, AWS",
+    "seniority": "Senior",
+    "work_model": "Remote",
+    "contract_types": ["Contractor", "CLT", "PJ"],
+    "salary": {
+      "international": { "currency": "USD", "period": "month", "min": 5000, "mid": 6000, "max": 8000 },
+      "pj_br": { "currency": "BRL", "period": "month", "min": 18000, "mid": 21000, "max": 25000 },
+      "clt_br": { "currency": "BRL", "period": "month", "min": 14000, "mid": 15000, "max": 16000 }
+    },
+    "start_availability": "30 days",
+    "notice_period": "30 days"
+  },
+  "experience": {
+    "total_years": 8,
+    "current_role": "Backend Engineer",
+    "stacks": ["Node.js", "TypeScript", "NestJS", "AWS", "PostgreSQL"],
+    "bio": {
+      "en": "Backend engineer focused on Node.js, TypeScript and distributed systems.",
+      "pt": "Engenheiro backend focado em Node.js, TypeScript e sistemas distribuidos."
+    },
+    "years_by_tech": {
+      "Node.js": 8, "TypeScript": 6, "NestJS": 4, "AWS": 5, "PostgreSQL": 7, "Docker": 5
+    }
+  },
+  "languages": [
+    { "language": "Portuguese", "level": "Native" },
+    { "language": "English", "level": "B2 / Upper-intermediate" }
+  ],
+  "education": [
+    { "kind": "degree", "title": "Computer Science", "institution": "Example University", "year": "2012", "status": "incomplete", "credential_id": "" },
+    { "kind": "certification", "title": "AWS Certified Developer", "institution": "AWS", "year": "2022", "status": "completed", "credential_id": "ABC123" }
+  ],
+  "open_answers": {
+    "pitch": "I am a backend engineer with 8 years of experience building Node.js and TypeScript services.",
+    "writing_style": "Write in first person, simple words, short sentences, at the candidate's real English level (around B2). No corporate polish, no AI jargon.",
+    "qa": {
+      "why_this_company": "I like building reliable backend systems and your product looks like a good fit for that."
+    }
+  },
+  "references": []
+}
