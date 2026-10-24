@@ -67,6 +67,8 @@ DEFAULTS = {
         # geografia: listas de palavras; vazio em geo_allow = aceita qualquer local
         "geo_allow": ["remote", "remoto", "worldwide", "anywhere", "global"],
         "geo_block": [],
+        # empresas/recrutadores a nunca aplicar (knockout por nome)
+        "company_block": [],
         # idioma de trabalho e bloqueio por idioma obrigatório
         "work_language": ["english", "portuguese"],
         "language_required_block": r"",
@@ -93,6 +95,8 @@ DEFAULTS = {
         "interest_cooldown_days": 180,
         "post_interval_days": 7,
         "cadence_seconds": [45, 240],
+        # janela de horário humano (vazio = sem restrição); o agente evita agir fora dela
+        "active_hours": {"start": "", "end": ""},
     },
     "sources": {
         "ats": True, "linkedin_jobs": True, "remotive": True,

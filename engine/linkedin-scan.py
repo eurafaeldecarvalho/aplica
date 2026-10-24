@@ -138,6 +138,9 @@ def main():
                         if not filtros.titulo_passa(v["titulo"]):
                             cont["titulo"] += 1
                             continue
+                        if not filtros.empresa_passa(v["empresa"]):
+                            cont["titulo"] += 1
+                            continue
                         if not filtros.local_passa(v["local"]):
                             cont["local"] += 1
                             continue

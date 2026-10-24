@@ -59,7 +59,7 @@ Duas rotinas nunca usam o Chrome ao mesmo tempo. **Adquirir/liberar é só do OR
   Isso faz o Chrome abrir o login do Google como aba normal dentro do seu grupo. Depois: clique → escolha **exatamente** a conta do usuário (o e-mail em `profile.identity.email`; o Chrome pode ter outras contas — nunca escolha outra) → aceite só o consentimento de login básico → a aba fecha e o site fica logado. Rode o script de novo se a página recarregar. Botão Google em `iframe` (GIS) → não dá; procure login por e-mail/código (pegue no Gmail) ou registre `JOBDB add-site --motivo sso-google-indisponivel` e siga.
 - Nunca feche abas fora do seu grupo, nunca feche a janela original do usuário, nunca faça logout.
 - **Orquestrador:** ao fim de cada subagente e ao encerrar, rode a mesma limpeza (sem `createIfEmpty`), como rede de segurança.
-- Página que não carrega em 5 min → feche e pule. **Ritmo humano:** intervalos irregulares (use `caps.cadence_seconds` [min,max]), nunca intervalo fixo.
+- Página que não carrega em 5 min → feche e pule. **Ritmo humano:** intervalos irregulares (use `caps.cadence_seconds` [min,max]), nunca intervalo fixo. Se `caps.active_hours` tiver `start`/`end` preenchidos, evite agir fora dessa janela (parece mais humano que atividade 24/7); faça pausas maiores a cada ~5–8 itens.
 
 ## 6. Subagentes
 

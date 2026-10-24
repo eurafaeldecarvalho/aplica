@@ -31,6 +31,7 @@
       "romania", "ukraine", "serbia", "philippines", "israel", "netherlands",
       "sweden", "switzerland", "italy", "apac", "emea"
     ],
+    "company_block": [],
     "work_language": ["english", "portuguese"],
     "language_required_block": "(spanish|español)\\s*(\\(|-|:)?\\s*(native|fluent|nativo|fluido|required|obligatorio|c1|c2)|fluent (in )?spanish|native spanish",
     "home_city": "",
@@ -52,7 +53,8 @@
     "interest_per_day": 0,
     "interest_cooldown_days": 180,
     "post_interval_days": 7,
-    "cadence_seconds": [45, 240]
+    "cadence_seconds": [45, 240],
+    "active_hours": { "start": "", "end": "" }
   },
   "sources": {
     "ats": true,

@@ -20,6 +20,7 @@
         "stack_out": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Mapa nome->regex de stacks que, como linguagem principal, eliminam a vaga." },
         "geo_allow": { "type": "array", "items": { "type": "string" }, "description": "Palavras de local aceito. Vazio = aceita qualquer local." },
         "geo_block": { "type": "array", "items": { "type": "string" }, "description": "Palavras de local/mercado barrado." },
+        "company_block": { "type": "array", "items": { "type": "string" }, "description": "Empresas/recrutadores a nunca aplicar (knockout por nome)." },
         "work_language": { "type": "array", "items": { "type": "string" } },
         "language_required_block": { "type": "string", "description": "Regex: idioma obrigatório que elimina a vaga." },
         "home_city": { "type": "string", "description": "Cidade do usuário; presencial/híbrido só é aceito aqui." },
@@ -72,6 +73,12 @@
           "type": "array", "items": { "type": "integer", "minimum": 0 },
           "minItems": 2, "maxItems": 2,
           "description": "[min, max] de segundos entre candidaturas (intervalo irregular)."
+        },
+        "active_hours": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Janela de horário humano (HH:MM). Vazio = sem restrição.",
+          "properties": { "start": { "type": "string" }, "end": { "type": "string" } }
         }
       }
     },
