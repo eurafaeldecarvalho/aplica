@@ -6,18 +6,21 @@ vazio, os filtros ficam permissivos (passa quase tudo) e a nota de fit cai para 
 Espelha os knockouts do skill apply-engine; mudou lá, ajuste o config, não este arquivo.
 """
 import re
+import sys
 import config
 
-_T = config.load_config().get("target", {})
+_T = config.load_config().get("target") or {}
 
 
-def _rx(pattern):
-    """Compila um regex (case-insensitive) ou devolve None se o pattern estiver vazio."""
+def _rx(pattern, campo="regex"):
+    """Compila um regex (case-insensitive) ou None se vazio. Regex inválida NÃO é engolida em
+    silêncio (isso desligaria um knockout de segurança): avisa no stderr e trata como ausente."""
     if not pattern:
         return None
     try:
         return re.compile(pattern, re.I)
-    except re.error:
+    except re.error as e:
+        print(f"[aplica] AVISO: regex inválida em target.{campo} ({e}); esse filtro ficou DESLIGADO. Corrija o config.", file=sys.stderr)
         return None
 
 
@@ -30,12 +33,12 @@ def _rx_words(words):
 
 
 # --- título ---
-TITULO_OK = _rx(_T.get("title_ok"))
-TITULO_RUIM = _rx(_T.get("title_bad"))
+TITULO_OK = _rx(_T.get("title_ok"), "title_ok")
+TITULO_RUIM = _rx(_T.get("title_bad"), "title_bad")
 
 # --- stack ---
-STACK_ALVO = _rx(_T.get("stack_target"))
-STACK_FORA = {k: _rx(v) for k, v in (_T.get("stack_out") or {}).items() if _rx(v)}
+STACK_ALVO = _rx(_T.get("stack_target"), "stack_target")
+STACK_FORA = {k: _rx(v, f"stack_out.{k}") for k, v in (_T.get("stack_out") or {}).items() if _rx(v, f"stack_out.{k}")}
 
 # --- geografia ---
 LOCAL_OK = _rx_words(_T.get("geo_allow"))
@@ -45,7 +48,7 @@ LOCAL_RUIM = _rx_words(_T.get("geo_block"))
 COMPANY_BLOCK = _rx_words(_T.get("company_block"))
 
 # --- idioma ---
-LINGUA_BLOQUEIO = _rx(_T.get("language_required_block"))
+LINGUA_BLOQUEIO = _rx(_T.get("language_required_block"), "language_required_block")
 
 # --- modalidade ---
 HOME_CITY = (_T.get("home_city") or "").strip().lower()

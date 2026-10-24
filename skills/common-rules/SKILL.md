@@ -71,13 +71,14 @@ Duas rotinas nunca usam o Chrome ao mesmo tempo. **Adquirir/liberar é só do OR
 
 ## 7. Gmail — corpo do e-mail (técnica obrigatória)
 
-O `type` não funciona no corpo do Gmail (contenteditable). Sequência: Compose → Para/Assunto com `form_input` → clique no corpo → injete via `javascript_tool`:
+O `type` não funciona no corpo do Gmail (contenteditable). **Nunca monte o JS interpolando o texto do corpo direto no código** (um travessão, crase, `${` ou aspas quebram o script ou injetam código no contexto logado). Passe o corpo como **DADO escapado**: gere a string JSON do texto (com a ferramenta `Write`/Python `json.dumps`, ou escapando à mão) e injete com `JSON.parse`. Sequência: Compose → Para/Assunto com `form_input` → clique no corpo → `javascript_tool`:
 ```javascript
+const text = JSON.parse(/* <string JSON do corpo, ex.: "Olá,\nSegue meu CV." > */);
 const body = document.querySelector('div[aria-label="Message Body"]');
 body.focus(); document.execCommand('selectAll', false, null);
-document.execCommand('insertText', false, `TEXTO_DO_CORPO_AQUI`); body.innerText;
+document.execCommand('insertText', false, text); body.innerText;
 ```
-Retorno vazio → `body.innerHTML = TEXTO; body.dispatchEvent(new Event('input', {bubbles:true}))`. Anexe o currículo (`file_upload` com o `resume` do config dir). Screenshot conferindo corpo + anexo → só então Enviar.
+Retorno vazio → `body.innerText = text; body.dispatchEvent(new Event('input', {bubbles:true}))` (use `innerText`/`textContent` com a string, **nunca** `innerHTML` com texto não escapado). Anexe o currículo (`file_upload` com o `resume` do config dir). Screenshot conferindo corpo + anexo → só então Enviar.
 
 ## 8. Todo texto em nome do usuário passa pelo humanizador
 

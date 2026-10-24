@@ -19,10 +19,22 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 PAUSA = (float(os.environ.get("LI_PAUSA_MIN", 9)), float(os.environ.get("LI_PAUSA_MAX", 13)))
 ESPERA_429 = float(os.environ.get("LI_ESPERA_429", 60))
 
-_T = config.load_config().get("target", {})
+_T = config.load_config().get("target") or {}
 BUSCAS = _T.get("titles_search") or ["Software Engineer", "Backend Engineer", "Developer"]
+
+
+def _par_local(x):
+    """Aceita 'São Paulo', ['São Paulo'] ou ['São Paulo', 'SP'] e normaliza para (local, rotulo)."""
+    if isinstance(x, str):
+        return (x, x or "ANY")
+    seq = list(x) if isinstance(x, (list, tuple)) else [str(x)]
+    loc = seq[0] if seq else ""
+    rot = seq[1] if len(seq) > 1 else (loc or "ANY")
+    return (loc, rot)
+
+
 # target.linkedin_locations: lista de [location, rotulo]. Default: busca global + remoto.
-LOCAIS = [tuple(x) for x in (_T.get("linkedin_locations") or [["", "ANY"]])]
+LOCAIS = [_par_local(x) for x in (_T.get("linkedin_locations") or [["", "ANY"]])]
 
 
 class Bloqueado(Exception):

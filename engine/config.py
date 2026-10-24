@@ -110,6 +110,9 @@ DEFAULTS = {
 def _deep_merge(base, over):
     out = dict(base)
     for k, v in (over or {}).items():
+        if v is None:
+            # null no config do usuário nunca sobrescreve um default (mantém o valor conservador).
+            continue
         if isinstance(v, dict) and isinstance(out.get(k), dict):
             out[k] = _deep_merge(out[k], v)
         else:
