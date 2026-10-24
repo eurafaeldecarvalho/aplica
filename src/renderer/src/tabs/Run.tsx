@@ -67,6 +67,11 @@ export default function Run(props: { config: any }): JSX.Element {
         A execução usa o plugin <strong>aplica</strong> instalado no Claude Code (<code>/aplica-run</code>) e a extensão Claude in Chrome.
         Confirme no Início que <code>claude</code> está no PATH e que o plugin está instalado.
       </div>
+      <div className="banner warn">
+        A rodada roda em <strong>modo autônomo</strong> (sem pedir aprovação de cada ação) para poder operar sem você. As travas são
+        as regras das skills (honestidade, parar no LinkedIn, nunca pagar/enviar documento) — não há um segundo gate. Rode só com as
+        suas contas, revise os defaults e use <strong>Parar</strong> se precisar interromper.
+      </div>
 
       <Card title="Rodar agora">
         <div className="field">

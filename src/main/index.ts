@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, isAbsolute } from 'path'
 import { promises as fs } from 'fs'
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import {
   configDir, configFile, profileFile, answersFile,
   enginePath, jobdbScript, findPython, findClaude, fileExists, needsShell
@@ -29,6 +29,18 @@ function resolveInConfig(rel: string): string {
   return isAbsolute(rel) ? rel : join(configDir(), rel)
 }
 
+/** Resumo seguro (e truncado) do input de uma tool, para auditar a execução sem vazar dados. */
+function toolHint(c: any): string {
+  const inp = c.input || {}
+  let hint = ''
+  if (c.name === 'Bash' && typeof inp.command === 'string') hint = inp.command.split('\n')[0]
+  else if (typeof inp.url === 'string') { try { hint = new URL(inp.url).host } catch { hint = inp.url } }
+  else if (typeof inp.action === 'string') hint = inp.action
+  else if (typeof inp.description === 'string') hint = inp.description
+  if (!hint) return ''
+  return ` (${hint.slice(0, 80)})`
+}
+
 /** Converte uma linha do stream-json do claude em texto legível para a UI (ou '' se irrelevante). */
 function formatStreamLine(line: string): string {
   const t = line.trim()
@@ -37,7 +49,7 @@ function formatStreamLine(line: string): string {
   try { o = JSON.parse(t) } catch { return t + '\n' }
   if (o.type === 'assistant' && o.message?.content) {
     const parts = o.message.content.map((c: any) =>
-      c.type === 'text' ? c.text : c.type === 'tool_use' ? `\n· ${c.name}` : '').join('')
+      c.type === 'text' ? c.text : c.type === 'tool_use' ? `\n· ${c.name}${toolHint(c)}` : '').join('')
     return parts ? parts + '\n' : ''
   }
   if (o.type === 'result') return `\n${o.result || '(sem resultado)'}\n`
@@ -246,7 +258,14 @@ function registerIpc(): void {
   })
   ipcMain.handle('routine:stop', async () => {
     if (!runningRoutine) return { ok: false, error: 'nada em execução' }
-    runningRoutine.kill()
+    const pid = runningRoutine.pid
+    // No Windows o processo guardado é o wrapper cmd.exe (shell:true); kill() só mata o wrapper e
+    // deixa o claude/node órfão. taskkill /T mata a árvore inteira — o kill switch precisa valer.
+    if (process.platform === 'win32' && pid) {
+      try { spawnSync('taskkill', ['/PID', String(pid), '/T', '/F']) } catch { /* ignore */ }
+    } else {
+      try { runningRoutine.kill('SIGTERM') } catch { /* ignore */ }
+    }
     return { ok: true }
   })
   ipcMain.handle('routine:running', async () => ({ running: !!runningRoutine }))
