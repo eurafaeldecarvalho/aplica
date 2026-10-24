@@ -48,10 +48,11 @@ This creates your config directory, walks you through `config.json` (your target
 ```bash
 /aplica-run            # run one round now (all sources)
 /aplica-run linkedin   # just LinkedIn Jobs
-/aplica-status         # today's applications, stuck jobs, to-dos
+/aplica-status         # today's applications, metrics, stuck jobs, to-dos
+/aplica-schedule       # turn config.schedule times into real scheduled tasks
 ```
 
-Or schedule the routines (ATS/boards, LinkedIn Jobs, recruiters, feed, daily summary) — see `scheduled-tasks/` for the templates; the app can wire these up for you with your own times.
+Or schedule the routines (ATS/boards, LinkedIn Jobs, recruiters, feed, daily summary): set the times (in the app, or by editing `config.json → schedule`), then run `/aplica-schedule` — it reads them and creates the scheduled tasks from the templates in `scheduled-tasks/`.
 
 ## How it works
 

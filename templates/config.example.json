@@ -42,6 +42,7 @@
     "social": { "comment": false, "connect": false, "dm": false, "like": false },
     "im_interested": false,
     "email_resume": false,
+    "email_summary": false,
     "sso_google": true,
     "create_account": false
   },
@@ -59,7 +60,6 @@
   "sources": {
     "ats": true,
     "linkedin_jobs": true,
-    "remotive": true,
     "freehire": true,
     "linkedin_feed": false
   },
