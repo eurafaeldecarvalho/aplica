@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG = {
     social: { comment: false, connect: false, dm: false, like: false },
     im_interested: false,
     email_resume: false,
+    email_summary: false,
     sso_google: true,
     create_account: false
   },
@@ -36,7 +37,7 @@ export const DEFAULT_CONFIG = {
     cadence_seconds: [45, 240],
     active_hours: { start: '', end: '' }
   },
-  sources: { ats: true, linkedin_jobs: true, remotive: true, freehire: true, linkedin_feed: false },
+  sources: { ats: true, linkedin_jobs: true, freehire: true, linkedin_feed: false },
   schedule: {
     ats: { enabled: false, times: ['06:00'] },
     linkedin_jobs: { enabled: false, times: ['10:00'] },

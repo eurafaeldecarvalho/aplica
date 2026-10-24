@@ -6,7 +6,12 @@ const clone = (o: any): any => JSON.parse(JSON.stringify(o))
 
 export default function Profile(props: { profile: any; onSave: (p: any) => Promise<void> }): JSX.Element {
   const [p, setP] = React.useState<any>(() => clone(props.profile))
+  const [answers, setAnswers] = React.useState('')
   const [saved, setSaved] = React.useState(false)
+
+  React.useEffect(() => {
+    window.aplica.readAnswers().then((r: any) => setAnswers(r?.text || ''))
+  }, [])
 
   const set = (path: string[], value: any): void => {
     const next = clone(p)
@@ -27,6 +32,7 @@ export default function Profile(props: { profile: any; onSave: (p: any) => Promi
 
   const save = async (): Promise<void> => {
     await props.onSave(p)
+    await window.aplica.writeAnswers(answers)
     setSaved(true)
   }
 
@@ -131,6 +137,11 @@ export default function Profile(props: { profile: any; onSave: (p: any) => Promi
       <Card title="Respostas abertas">
         <TextArea label="Pitch" value={g(['open_answers', 'pitch'])} onChange={(v) => set(['open_answers', 'pitch'], v)} />
         <TextArea label="Estilo de escrita (idioma/voz com que o agente escreve por você)" value={g(['open_answers', 'writing_style'])} onChange={(v) => set(['open_answers', 'writing_style'], v)} />
+        <KeyTextEditor label="Banco de respostas reutilizáveis (pergunta → resposta)" value={g(['open_answers', 'qa'], {})} onChange={(v) => set(['open_answers', 'qa'], v)} />
+      </Card>
+
+      <Card title="Respostas longas (answers.md)" hint="Texto livre que o agente consulta para respostas abertas longas. Salvo junto com Meus dados.">
+        <TextArea label="answers.md" value={answers} onChange={(v) => { setAnswers(v); setSaved(false) }} rows={10} />
       </Card>
 
       <SaveBar onSave={save} saved={saved} />
@@ -194,6 +205,30 @@ function KeyNumEditor(props: { label: string; value: Record<string, number>; onC
         </div>
       ))}
       <button className="btn secondary" onClick={add}>Adicionar</button>
+    </div>
+  )
+}
+
+function KeyTextEditor(props: { label: string; value: Record<string, string>; onChange: (v: any) => void }): JSX.Element {
+  const entries = Object.entries(props.value || {})
+  const add = (): void => {
+    const k = prompt('Pergunta (texto exato do formulário):')
+    if (!k) return
+    props.onChange({ ...props.value, [k]: '' })
+  }
+  return (
+    <div className="field">
+      <label>{props.label}</label>
+      {entries.map(([k, v]) => (
+        <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 8 }}>
+          <span className="tag" style={{ minWidth: 160, justifyContent: 'space-between' }}>
+            {k.length > 24 ? k.slice(0, 24) + '…' : k}
+            <button onClick={() => { const n = { ...props.value }; delete n[k]; props.onChange(n) }}>×</button>
+          </span>
+          <textarea style={{ flex: 1, minHeight: 48 }} value={v} placeholder="resposta" onChange={(e) => props.onChange({ ...props.value, [k]: e.target.value })} />
+        </div>
+      ))}
+      <button className="btn secondary" onClick={add}>Adicionar pergunta/resposta</button>
     </div>
   )
 }

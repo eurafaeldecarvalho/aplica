@@ -14,7 +14,22 @@ export default function Run(props: { config: any }): JSX.Element {
   const [source, setSource] = React.useState('all')
   const [output, setOutput] = React.useState('')
   const [running, setRunning] = React.useState(false)
+  const [blockers, setBlockers] = React.useState<string[]>([])
   const preRef = React.useRef<HTMLPreElement>(null)
+
+  React.useEffect(() => {
+    (async () => {
+      const b: string[] = []
+      const pr: any = await window.aplica.checkPrereqs()
+      if (!pr.claude) b.push('Claude Code CLI (`claude`) não encontrado no PATH')
+      if (!pr.python) b.push('Python não encontrado no PATH')
+      if (!pr.configPresent) b.push('config.json ausente — preencha Preferências de vaga/Comportamento e Salve')
+      if (!pr.profilePresent) b.push('profile.json ausente — preencha Meus dados e Salve')
+      const chk: any = await window.aplica.dbCheck()
+      if (!(chk.stdout || '').trim().endsWith('OK')) b.push('Banco não inicializado — Início → Inicializar banco')
+      setBlockers(b)
+    })()
+  }, [])
 
   React.useEffect(() => {
     const off = window.aplica.onRoutineOutput((chunk) => {
@@ -61,8 +76,14 @@ export default function Run(props: { config: any }): JSX.Element {
           </select>
         </div>
         {feedWarn && <div className="banner warn" style={{ marginTop: 0 }}>O feed está em modo <strong>off</strong> no Comportamento; essa rotina não fará nada.</div>}
+        {blockers.length > 0 && (
+          <div className="banner warn" style={{ marginTop: 0 }}>
+            Complete o Início antes de rodar:
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+          </div>
+        )}
         <div className="btn-row">
-          <button className="btn" onClick={run} disabled={running}>{running ? 'Rodando…' : 'Rodar'}</button>
+          <button className="btn" onClick={run} disabled={running || blockers.length > 0}>{running ? 'Rodando…' : 'Rodar'}</button>
           {running && <button className="btn secondary" onClick={stop}>Parar</button>}
         </div>
       </Card>

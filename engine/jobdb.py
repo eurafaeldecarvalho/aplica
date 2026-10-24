@@ -9,6 +9,9 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 DB = config.DB
 BACKUPS = config.BACKUPS
 KEEP_BACKUPS = 30
+# Versão do schema do state.db. Carimbada na tabela `controle` no init e conferida no check —
+# detecta drift se um banco criado por uma versão antiga do motor for aberto por uma mais nova.
+SCHEMA_VERSION = "1"
 
 STATUS_CAND = ("aplicada", "incerta", "teste-pendente", "em-processo", "entrevista",
                "rejeitada", "sem-retorno", "oferta", "desistiu")
@@ -342,8 +345,10 @@ def dedup(con, url, empresa, titulo):
 def cmd_init(a):
     con = conectar(criar=True)
     con.executescript(SCHEMA)
+    con.execute("INSERT INTO controle (chave,valor) VALUES ('schema_version',?) "
+                "ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor", (SCHEMA_VERSION,))
     con.commit()
-    print(f"OK schema em {DB}")
+    print(f"OK schema em {DB} (schema_version={SCHEMA_VERSION})")
 
 
 def cmd_check(a):
@@ -363,6 +368,10 @@ def cmd_check(a):
             sys.exit(1)
         for t in TABELAS:
             print(f"{t}: {con.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]}")
+        r = con.execute("SELECT valor FROM controle WHERE chave='schema_version'").fetchone()
+        ver = r[0] if r else None
+        if ver and ver != SCHEMA_VERSION:
+            print(f"AVISO:schema-version banco={ver} motor={SCHEMA_VERSION} (drift entre cópias do engine — ressincronize)")
     except sqlite3.Error as e:
         print(f"ERRO:sqlite {e}")
         sys.exit(1)

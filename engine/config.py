@@ -83,6 +83,7 @@ DEFAULTS = {
         "social": {"comment": False, "connect": False, "dm": False, "like": False},
         "im_interested": False,
         "email_resume": False,
+        "email_summary": False,
         "sso_google": True,
         "create_account": False,
     },
@@ -99,7 +100,7 @@ DEFAULTS = {
         "active_hours": {"start": "", "end": ""},
     },
     "sources": {
-        "ats": True, "linkedin_jobs": True, "remotive": True,
+        "ats": True, "linkedin_jobs": True,
         "freehire": True, "linkedin_feed": False,
     },
     "current_employer": [],

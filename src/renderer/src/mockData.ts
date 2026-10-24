@@ -18,14 +18,14 @@ export const DEFAULT_CONFIG = {
   behavior: {
     feed_mode: 'off',
     social: { comment: false, connect: false, dm: false, like: false },
-    im_interested: false, email_resume: false, sso_google: true, create_account: false
+    im_interested: false, email_resume: false, email_summary: false, sso_google: true, create_account: false
   },
   caps: {
     applications_per_day: 15, max_batches: 10, batch_size: 5,
     social_per_day: 0, interest_per_day: 0, interest_cooldown_days: 180,
     post_interval_days: 7, cadence_seconds: [45, 240], active_hours: { start: '', end: '' }
   },
-  sources: { ats: true, linkedin_jobs: true, remotive: true, freehire: true, linkedin_feed: false },
+  sources: { ats: true, linkedin_jobs: true, freehire: true, linkedin_feed: false },
   schedule: {
     ats: { enabled: false, times: ['06:00'] },
     linkedin_jobs: { enabled: false, times: ['10:00'] },

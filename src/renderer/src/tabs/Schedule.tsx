@@ -29,7 +29,8 @@ export default function Schedule(props: { config: any; onSave: (c: any) => Promi
       </div>
 
       <div className="banner info">
-        A agenda é salva no seu config. Para efetivar as tarefas agendadas, rode o assistente no Claude Code (o app passará estes horários ao plugin).
+        A agenda é salva no seu config. Para efetivá-la, rode <code>/aplica-schedule</code> no Claude Code — ele lê estes
+        horários e cria/atualiza as tarefas agendadas das rotinas (o app não consegue criar tarefas sozinho).
       </div>
 
       {Object.keys(LABELS).map((k) => (

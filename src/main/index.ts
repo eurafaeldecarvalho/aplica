@@ -29,6 +29,22 @@ function resolveInConfig(rel: string): string {
   return isAbsolute(rel) ? rel : join(configDir(), rel)
 }
 
+/** Converte uma linha do stream-json do claude em texto legível para a UI (ou '' se irrelevante). */
+function formatStreamLine(line: string): string {
+  const t = line.trim()
+  if (!t) return ''
+  let o: any
+  try { o = JSON.parse(t) } catch { return t + '\n' }
+  if (o.type === 'assistant' && o.message?.content) {
+    const parts = o.message.content.map((c: any) =>
+      c.type === 'text' ? c.text : c.type === 'tool_use' ? `\n· ${c.name}` : '').join('')
+    return parts ? parts + '\n' : ''
+  }
+  if (o.type === 'result') return `\n${o.result || '(sem resultado)'}\n`
+  if (o.type === 'system' && o.subtype === 'init') return '[sessão iniciada]\n'
+  return ''
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1180,
@@ -202,10 +218,26 @@ function registerIpc(): void {
     const src = SOURCES.has(source) ? source : 'all'
     const env = { ...process.env, APLICA_HOME: configDir() }
     const prompt = `/aplica-run ${src}`
-    const child = spawn(claude, ['-p', prompt], { env, shell: needsShell() })
+    // O usuário está offline durante a execução → modo autônomo (bypassPermissions) para que o
+    // agente possa usar Bash, o navegador (mcp__claude-in-chrome__*) e subagentes sem prompt de
+    // aprovação (impossível em -p). stream-json + verbose dá saída ao vivo. O prompt vai por STDIN
+    // (evita word-split do shell no Windows e injeção via argv).
+    const args = ['-p', '--permission-mode', 'bypassPermissions', '--output-format', 'stream-json', '--verbose']
+    const child = spawn(claude, args, { env, shell: needsShell() })
     runningRoutine = child
+    try { child.stdin?.write(prompt + '\n'); child.stdin?.end() } catch { /* ignore */ }
     const send = (chunk: string): void => e.sender.send('routine:output', chunk)
-    child.stdout?.on('data', (d) => send(d.toString()))
+    let buf = ''
+    child.stdout?.on('data', (d) => {
+      buf += d.toString()
+      let nl: number
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl)
+        buf = buf.slice(nl + 1)
+        const text = formatStreamLine(line)
+        if (text) send(text)
+      }
+    })
     child.stderr?.on('data', (d) => send(d.toString()))
     return await new Promise((resolve) => {
       child.on('error', (err) => { runningRoutine = null; send(`\n[erro] ${err}\n`); resolve({ ok: false, error: String(err) }) })

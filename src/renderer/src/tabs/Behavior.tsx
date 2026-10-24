@@ -35,6 +35,7 @@ export default function Behavior(props: { config: any; onSave: (c: any) => Promi
         <Toggle label="Login com Google (SSO)" desc="Tentar 'Continuar com Google' em sites novos." checked={b.sso_google} onChange={(v) => setB('sso_google', v)} />
         <Toggle label="Criar conta nova" desc="Em sites sem SSO. Senha nunca é guardada em texto plano." checked={b.create_account} onChange={(v) => setB('create_account', v)} />
         <Toggle label="Enviar currículo por e-mail" desc="Quando um recrutador/post pedir o CV por e-mail." checked={b.email_resume} onChange={(v) => setB('email_resume', v)} />
+        <Toggle label="Enviar resumo diário por e-mail" desc="A rotina de resumo manda o relatório do dia para o seu próprio e-mail." checked={b.email_summary} onChange={(v) => setB('email_summary', v)} />
         <Toggle label="'I'm interested' na empresa" desc="Sinaliza interesse privado em vagas de fit alto no LinkedIn." checked={b.im_interested} onChange={(v) => setB('im_interested', v)} />
       </Card>
 
