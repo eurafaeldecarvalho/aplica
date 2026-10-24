@@ -29,7 +29,9 @@ const api = {
   onRoutineOutput: (cb: (chunk: string) => void) => {
     const handler = (_e: unknown, chunk: string): void => cb(chunk)
     ipcRenderer.on('routine:output', handler)
-    return () => ipcRenderer.removeListener('routine:output', handler)
+    return (): void => {
+      ipcRenderer.removeListener('routine:output', handler)
+    }
   }
 }
 
