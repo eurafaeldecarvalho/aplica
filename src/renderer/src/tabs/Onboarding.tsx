@@ -30,6 +30,8 @@ export default function Onboarding(props: {
   const refresh = React.useCallback(async () => { setPr(await window.aplica.checkPrereqs()) }, [])
   const recheckChrome = React.useCallback(async () => { setChrome(await window.aplica.detectChrome()) }, [])
   React.useEffect(() => { refresh(); recheckChrome() }, [refresh, recheckChrome])
+  // re-checa os pré-requisitos quando config/profile mudam (ex.: após salvar no modal de Settings)
+  React.useEffect(() => { refresh() }, [props.config, props.profile, refresh])
 
   const initDb = async (): Promise<void> => {
     setBusy(true)

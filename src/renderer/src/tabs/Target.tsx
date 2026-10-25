@@ -3,16 +3,17 @@ import { Card, Field, TagInput, Toggle, SaveBar } from '../ui'
 
 const clone = (o: any): any => JSON.parse(JSON.stringify(o))
 
-export default function Target(props: { config: any; onSave: (c: any) => Promise<void>; embedded?: boolean }): JSX.Element {
+export default function Target(props: { config: any; onSave: (c: any) => Promise<void>; embedded?: boolean; onDirty?: (v: boolean) => void }): JSX.Element {
   const [c, setC] = React.useState<any>(() => clone(props.config))
   const [saved, setSaved] = React.useState(false)
   const t = c.target || {}
+  const touch = (): void => { setSaved(false); props.onDirty?.(true) }
 
-  const setT = (k: string, v: any): void => { const n = clone(c); n.target = { ...(n.target || {}), [k]: v }; setC(n); setSaved(false) }
-  const setMode = (k: string, v: boolean): void => { const n = clone(c); const base = n.target || (n.target = {}); base.work_modes = { ...(base.work_modes || {}), [k]: v }; setC(n); setSaved(false) }
-  const setSource = (k: string, v: boolean): void => { const n = clone(c); n.sources = { ...(n.sources || {}), [k]: v }; setC(n); setSaved(false) }
+  const setT = (k: string, v: any): void => { const n = clone(c); n.target = { ...(n.target || {}), [k]: v }; setC(n); touch() }
+  const setMode = (k: string, v: boolean): void => { const n = clone(c); const base = n.target || (n.target = {}); base.work_modes = { ...(base.work_modes || {}), [k]: v }; setC(n); touch() }
+  const setSource = (k: string, v: boolean): void => { const n = clone(c); n.sources = { ...(n.sources || {}), [k]: v }; setC(n); touch() }
 
-  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true) }
+  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true); props.onDirty?.(false) }
   const sourceLabels: Record<string, string> = { ats: 'ATS boards (Lever/Greenhouse/Ashby)', linkedin_jobs: 'LinkedIn Jobs', freehire: 'freehire aggregator', linkedin_feed: 'LinkedIn feed' }
 
   return (

@@ -12,7 +12,7 @@ Aplica app is the friendly front-end for the **[aplica](https://github.com/euraf
 
 ## What you get
 
-- **Home** — prerequisite checks with one-click install helpers (Python, Claude Code CLI), Claude in Chrome detection + install button, résumé/photo picker, and the disclaimer. The local database is created automatically on first launch (bundled engine, isolated per app — it never points at an existing DB on your machine).
+- **Home** — a profile-completeness meter, prerequisite checks with quick links to install Python and the Claude Code CLI, Claude in Chrome detection + install button, résumé/photo picker, and the disclaimer. The local database is created automatically on first launch by the bundled engine, in the Aplica config dir (the same one the plugin uses, so it continues your existing Aplica history) — it is never an unrelated database on your machine.
 - **Settings** (one modal, all config):
   - *Your data* — your real data (identity, links, work authorization, salary by modality, experience, years-per-tech, languages, education) plus the common application questions answered in your own voice. Writes `profile.json` / `answers.md`.
   - *Job preferences* — titles, stack, geography, company blocklist, language, work modes, sources. Writes `config.json → target`.
@@ -20,6 +20,7 @@ Aplica app is the friendly front-end for the **[aplica](https://github.com/euraf
   - *Schedule* — times for each routine; run `/aplica-schedule` in Claude Code to turn them into real scheduled tasks.
 - **Dashboard** — applications, response rate by source, follow-ups, stuck jobs and to-dos, read live from your local database.
 - **Run** — run a round now via `claude -p`, autonomous, with live output and a Stop button.
+- **Notifications** — aggregated signals from the engine (LinkedIn/Gmail sign-in issues, blocked sites, pending items, stuck jobs, recent run results), with an alert count in the sidebar.
 
 ## Windows SmartScreen ("unknown publisher")
 

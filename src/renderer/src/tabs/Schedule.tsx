@@ -12,15 +12,16 @@ const LABELS: Record<string, string> = {
   summary: 'Daily summary'
 }
 
-export default function Schedule(props: { config: any; onSave: (c: any) => Promise<void>; embedded?: boolean }): JSX.Element {
+export default function Schedule(props: { config: any; onSave: (c: any) => Promise<void>; embedded?: boolean; onDirty?: (v: boolean) => void }): JSX.Element {
   const [c, setC] = React.useState<any>(() => clone(props.config))
   const [saved, setSaved] = React.useState(false)
   const sch = c.schedule || {}
+  const touch = (): void => { setSaved(false); props.onDirty?.(true) }
 
-  const setEnabled = (k: string, v: boolean): void => { const n = clone(c); n.schedule = { ...(n.schedule || {}), [k]: { ...(n.schedule?.[k] || {}), enabled: v } }; setC(n); setSaved(false) }
-  const setTimes = (k: string, times: string[]): void => { const n = clone(c); n.schedule = { ...(n.schedule || {}), [k]: { ...(n.schedule?.[k] || {}), times } }; setC(n); setSaved(false) }
+  const setEnabled = (k: string, v: boolean): void => { const n = clone(c); n.schedule = { ...(n.schedule || {}), [k]: { ...(n.schedule?.[k] || {}), enabled: v } }; setC(n); touch() }
+  const setTimes = (k: string, times: string[]): void => { const n = clone(c); n.schedule = { ...(n.schedule || {}), [k]: { ...(n.schedule?.[k] || {}), times } }; setC(n); touch() }
 
-  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true) }
+  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true); props.onDirty?.(false) }
 
   return (
     <>

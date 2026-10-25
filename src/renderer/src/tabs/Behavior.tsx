@@ -4,17 +4,18 @@ import { Icon } from '../icons'
 
 const clone = (o: any): any => JSON.parse(JSON.stringify(o))
 
-export default function Behavior(props: { config: any; onSave: (c: any) => Promise<void>; embedded?: boolean }): JSX.Element {
+export default function Behavior(props: { config: any; onSave: (c: any) => Promise<void>; embedded?: boolean; onDirty?: (v: boolean) => void }): JSX.Element {
   const [c, setC] = React.useState<any>(() => clone(props.config))
   const [saved, setSaved] = React.useState(false)
   const b = c.behavior || {}
   const caps = c.caps || {}
+  const touch = (): void => { setSaved(false); props.onDirty?.(true) }
 
-  const setB = (k: string, v: any): void => { const n = clone(c); n.behavior = { ...(n.behavior || {}), [k]: v }; setC(n); setSaved(false) }
-  const setSocial = (k: string, v: boolean): void => { const n = clone(c); const base = n.behavior || (n.behavior = {}); base.social = { ...(base.social || {}), [k]: v }; setC(n); setSaved(false) }
-  const setCap = (k: string, v: any): void => { const n = clone(c); n.caps = { ...(n.caps || {}), [k]: v }; setC(n); setSaved(false) }
+  const setB = (k: string, v: any): void => { const n = clone(c); n.behavior = { ...(n.behavior || {}), [k]: v }; setC(n); touch() }
+  const setSocial = (k: string, v: boolean): void => { const n = clone(c); const base = n.behavior || (n.behavior = {}); base.social = { ...(base.social || {}), [k]: v }; setC(n); touch() }
+  const setCap = (k: string, v: any): void => { const n = clone(c); n.caps = { ...(n.caps || {}), [k]: v }; setC(n); touch() }
 
-  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true) }
+  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true); props.onDirty?.(false) }
   const socialOn = (b.social && (b.social.comment || b.social.connect || b.social.dm || b.social.like)) || b.feed_mode === 'full'
 
   return (

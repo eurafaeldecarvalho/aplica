@@ -5,7 +5,7 @@ import { COMMON_QUESTIONS, omitCommon, pickCommon } from '../questions'
 
 const clone = (o: any): any => JSON.parse(JSON.stringify(o))
 
-export default function Profile(props: { profile: any; onSave: (p: any) => Promise<void>; embedded?: boolean }): JSX.Element {
+export default function Profile(props: { profile: any; onSave: (p: any) => Promise<void>; embedded?: boolean; onDirty?: (v: boolean) => void }): JSX.Element {
   const [p, setP] = React.useState<any>(() => clone(props.profile))
   const [answers, setAnswers] = React.useState('')
   const [saved, setSaved] = React.useState(false)
@@ -17,14 +17,14 @@ export default function Profile(props: { profile: any; onSave: (p: any) => Promi
     let cur = next
     for (let i = 0; i < path.length - 1; i++) { cur[path[i]] = cur[path[i]] ?? {}; cur = cur[path[i]] }
     cur[path[path.length - 1]] = value
-    setP(next); setSaved(false)
+    setP(next); setSaved(false); props.onDirty?.(true)
   }
   const g = (path: string[], fallback: any = ''): any => {
     let cur = p
     for (const k of path) { cur = cur?.[k]; if (cur === undefined) return fallback }
     return cur ?? fallback
   }
-  const save = async (): Promise<void> => { await props.onSave(p); await window.aplica.writeAnswers(answers); setSaved(true) }
+  const save = async (): Promise<void> => { await props.onSave(p); await window.aplica.writeAnswers(answers); setSaved(true); props.onDirty?.(false) }
 
   return (
     <>
@@ -130,7 +130,7 @@ export default function Profile(props: { profile: any; onSave: (p: any) => Promi
 
       <Card title="Other questions" hint="Add any extra question/answer the common list doesn't cover.">
         <KeyTextEditor label="Custom question → answer" value={omitCommon(g(['open_answers', 'qa'], {}))} onChange={(v) => set(['open_answers', 'qa'], { ...pickCommon(g(['open_answers', 'qa'], {})), ...omitCommon(v) })} />
-        <TextArea label="Free notes (answers.md) — long-form context the agent can draw from" value={answers} onChange={(v) => { setAnswers(v); setSaved(false) }} rows={8} />
+        <TextArea label="Free notes (answers.md) — long-form context the agent can draw from" value={answers} onChange={(v) => { setAnswers(v); setSaved(false); props.onDirty?.(true) }} rows={8} />
       </Card>
 
       <SaveBar onSave={save} saved={saved} embedded={props.embedded} />

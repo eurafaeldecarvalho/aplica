@@ -30,15 +30,28 @@ export default function Run(props: { config: any; onOpenSettings: () => void }):
     setBlockers(b)
   }, [])
 
+  // mount-only: assina a saída e sincroniza o estado "running" com o backend (recupera ao voltar à aba)
   React.useEffect(() => {
-    preflight()
     window.aplica.isRunning().then((s: any) => setRunning(!!s?.running))
     const off = window.aplica.onRoutineOutput((chunk) => {
       setOutput((o) => o + chunk)
       requestAnimationFrame(() => { if (preRef.current) preRef.current.scrollTop = preRef.current.scrollHeight })
     })
     return off
-  }, [preflight])
+  }, [])
+
+  // re-roda o preflight quando a configuração muda (ex.: após salvar no modal de Settings)
+  React.useEffect(() => { preflight() }, [preflight, props.config])
+
+  // enquanto rodando, confere o backend para o botão se recuperar após remontagem/conclusão
+  React.useEffect(() => {
+    if (!running) return
+    const t = setInterval(async () => {
+      const s: any = await window.aplica.isRunning()
+      if (!s?.running) setRunning(false)
+    }, 3000)
+    return () => clearInterval(t)
+  }, [running])
 
   const run = async (): Promise<void> => {
     setOutput(''); setRunning(true)
