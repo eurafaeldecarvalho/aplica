@@ -13,7 +13,12 @@ export default function Target(props: { config: any; onSave: (c: any) => Promise
   const setMode = (k: string, v: boolean): void => { const n = clone(c); const base = n.target || (n.target = {}); base.work_modes = { ...(base.work_modes || {}), [k]: v }; setC(n); touch() }
   const setSource = (k: string, v: boolean): void => { const n = clone(c); n.sources = { ...(n.sources || {}), [k]: v }; setC(n); touch() }
 
-  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true); props.onDirty?.(false) }
+  // salva só as fatias desta seção (target, sources) sobre o config mais recente,
+  // para não reverter o que outra seção montada salvou nesta sessão do modal.
+  const save = async (): Promise<void> => {
+    const n = clone(props.config); n.target = c.target; n.sources = c.sources
+    await props.onSave(n); setC(n); setSaved(true); props.onDirty?.(false)
+  }
   const sourceLabels: Record<string, string> = { ats: 'ATS boards (Lever/Greenhouse/Ashby)', linkedin_jobs: 'LinkedIn Jobs', freehire: 'freehire aggregator', linkedin_feed: 'LinkedIn feed' }
 
   return (

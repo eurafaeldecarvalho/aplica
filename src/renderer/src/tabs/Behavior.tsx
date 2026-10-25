@@ -15,7 +15,11 @@ export default function Behavior(props: { config: any; onSave: (c: any) => Promi
   const setSocial = (k: string, v: boolean): void => { const n = clone(c); const base = n.behavior || (n.behavior = {}); base.social = { ...(base.social || {}), [k]: v }; setC(n); touch() }
   const setCap = (k: string, v: any): void => { const n = clone(c); n.caps = { ...(n.caps || {}), [k]: v }; setC(n); touch() }
 
-  const save = async (): Promise<void> => { await props.onSave(c); setSaved(true); props.onDirty?.(false) }
+  // salva só as fatias desta seção (behavior, caps) sobre o config mais recente.
+  const save = async (): Promise<void> => {
+    const n = clone(props.config); n.behavior = c.behavior; n.caps = c.caps
+    await props.onSave(n); setC(n); setSaved(true); props.onDirty?.(false)
+  }
   const socialOn = (b.social && (b.social.comment || b.social.connect || b.social.dm || b.social.like)) || b.feed_mode === 'full'
 
   return (
