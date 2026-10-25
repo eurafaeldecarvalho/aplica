@@ -27,7 +27,7 @@ Aplica é montado e rodado **pelo próprio usuário** para a busca de emprego **
 
 - **Config:** leia `config.json` do config dir (toggles, alvo, tetos, fontes). Os toggles que mandam no comportamento social: `behavior.feed_mode` (`full`|`apply_only`|`off`), `behavior.social.{comment,connect,dm,like}`, `behavior.im_interested`, `behavior.email_resume`, `behavior.sso_google`, `behavior.create_account`. Os tetos em `caps.*`. **Default de fábrica: social OFF, tetos baixos** — respeite o que estiver no config, não invente.
 - **Estado = SQLite `state.db`, só pela CLI `JOBDB`.** Nunca edite o `.db` direto, nunca crie banco novo, nunca grave estado em `.md`.
-- **Health-check no início de toda rotina:** `JOBDB check` → última linha `OK`. Senão: registre e encerre (sem banco não há dedup — candidatar às cegas duplica candidatura). Não tente consertar.
+- **Health-check no início de toda rotina:** `JOBDB check` → última linha `OK`. O plugin **cria o próprio banco automaticamente** se ele ainda não existir (isolado no config dir `~/.config/aplica` / `%APPDATA%\aplica`, nunca apontando para um banco já existente na máquina), então a 1ª execução também fica `OK`. Se vier `ERRO:...`, registre e encerre (sem banco não há dedup — candidatar às cegas duplica candidatura). Não tente consertar.
 - Comandos mais usados: `dedup`, `add-candidatura`, `update-candidatura`, `add-descarte`, `add-pergunta`, `perguntas --com-resposta`, `add-site`, `sites-ativos`, `add-contato`, `contato-recente`, `social-hoje`, `linkedin-status`, `interesse-check`, `travada add|list`, `pendencia add|list|feita`, `log`, `hoje`, `relatorio`, `lock`, `backup`.
 
 ## 3. Trava do navegador (um Chrome só)

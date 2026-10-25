@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/eurafaeldecarvalho/aplica/config.schema.json",
+  "$id": "https://github.com/eurafaeldecarvalho/aplica-claude-plugin/config.schema.json",
   "title": "Aplica config.json",
   "description": "Settings/toggles/alvo/fontes/agenda de uma instância do Aplica. Contrato compartilhado entre o motor (plugin) e o app desktop. Dados pessoais do candidato ficam em profile.json.",
   "type": "object",

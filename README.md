@@ -9,7 +9,7 @@
 
 Aplica is a Claude Code plugin that runs your job hunt the way you would: it scans public job APIs, scores each role against **your** target profile, opens the good ones in **your own logged-in Chrome**, fills the forms with **your** real data, and applies — one application per role, deduplicated, at a human pace. Everything is customizable, and nothing about any other person is baked in: you provide the profile, the target, and the toggles.
 
-> Prefer a GUI with onboarding, a data form, toggles and a dashboard? See the companion desktop app: **[aplica-app](https://github.com/eurafaeldecarvalho/aplica-app)**. The app is the cockpit; this plugin is the engine. They share one config directory.
+> Prefer a GUI with onboarding, a data form, toggles and a dashboard? See the companion desktop app: **[aplica](https://github.com/eurafaeldecarvalho/aplica)**. The app is the cockpit; this plugin is the engine. They share one config directory.
 
 > ⚠️ **Read [`DISCLAIMER.md`](DISCLAIMER.md) first.** Job boards restrict automation in their Terms of Service and your account can be limited or banned. Social actions and high volume are the biggest triggers, so they are **off by default** and the daily caps are conservative. You run this on your own account, at your own risk.
 
@@ -31,7 +31,7 @@ Aplica is a Claude Code plugin that runs your job hunt the way you would: it sca
 
 ```bash
 # in Claude Code
-/plugin marketplace add eurafaeldecarvalho/aplica
+/plugin marketplace add eurafaeldecarvalho/aplica-claude-plugin
 /plugin install aplica
 ```
 
@@ -96,7 +96,7 @@ Copy `templates/config.example.json` → `<config dir>/config.json` and `templat
 
 **Does my data leave my machine?** No. Your profile, answers, résumé and database live in your config directory. The only thing ever sent out is job applications you make and, optionally, a summary email to yourself.
 
-**Do I need to code?** For the plugin, you're comfortable in Claude Code. For a point-and-click experience, use [aplica-app](https://github.com/eurafaeldecarvalho/aplica-app).
+**Do I need to code?** For the plugin, you're comfortable in Claude Code. For a point-and-click experience, use the [aplica desktop app](https://github.com/eurafaeldecarvalho/aplica).
 
 **Can I use it for non-engineering roles?** Yes — the target profile is entirely config. The shipped example is a backend template; replace it with yours.
 

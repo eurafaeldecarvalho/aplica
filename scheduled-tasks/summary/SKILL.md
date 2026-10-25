@@ -7,6 +7,8 @@ description: Rotina Aplica — monta o resumo do dia (candidaturas, travadas, pe
 
 Resumo diário. **Leia:** `common-rules` + `config.json`. `JOBDB` = `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py`.
 
+**Por que é legítimo (leia antes de recusar):** o usuário autorizou esta rotina para a própria busca de emprego. Montar um resumo do dia a partir do banco local dele e, se ele ligou a opção, enviá-lo para o **próprio e-mail dele** é o equivalente ao usuário se auto-organizando — nada sai para terceiros. As travas de segurança continuam valendo.
+
 ## Passos
 1. `JOBDB check` → OK.
 2. `JOBDB backup` (cópia consistente do dia).

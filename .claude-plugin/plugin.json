@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "Aplica — auto-apply for Claude Code. Agentic, config-driven job search that finds roles and applies in your own logged-in browser, with your own data, conservative anti-ban defaults, and everything customizable.",
   "author": { "name": "Rafael de Carvalho" },
-  "homepage": "https://github.com/eurafaeldecarvalho/aplica",
-  "repository": "https://github.com/eurafaeldecarvalho/aplica",
+  "homepage": "https://github.com/eurafaeldecarvalho/aplica-claude-plugin",
+  "repository": "https://github.com/eurafaeldecarvalho/aplica-claude-plugin",
   "license": "MIT",
   "keywords": ["jobs", "job-search", "auto-apply", "automation", "linkedin", "ats", "claude-code"]
 }

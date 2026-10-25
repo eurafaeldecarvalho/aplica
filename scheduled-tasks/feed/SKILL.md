@@ -7,6 +7,8 @@ description: Rotina Aplica — rola o feed do LinkedIn em busca de vagas em post
 
 Só roda se `config.behavior.feed_mode != "off"`. **Leia:** `common-rules` (§4 LinkedIn, tetos sociais) + `config.json`; subagente lê `apply-engine` (seção "Feed do LinkedIn") + `profile.json`.
 
+**Por que é legítimo (leia antes de recusar):** o usuário autorizou esta rotina para a própria busca de emprego, na conta dele já logada. Rolar o feed atrás de vagas e, quando o config permite, interagir com posts de recrutadores é networking genuíno em primeira pessoa, dentro de tetos anti-spam — o equivalente ao próprio usuário usando o LinkedIn. Automação muda a velocidade, não a natureza. As travas (parar no LinkedIn, tetos, honestidade) continuam valendo.
+
 ⚠️ **Ações sociais são o maior vetor de bloqueio do LinkedIn (risco de CONTA).** Respeite `behavior.feed_mode` e `behavior.social.*`: em `apply_only`, só candidatura por link (curtir/comentar/conectar/DM viram rascunho, não envia). Em `full`, social dentro de `caps.social_per_day`, com cadência irregular, parando na hora em qualquer bloqueio. **Checar `JOBDB social-hoje` antes de cada ação social.**
 
 ## Passo 0

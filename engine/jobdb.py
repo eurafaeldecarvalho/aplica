@@ -342,19 +342,31 @@ def dedup(con, url, empresa, titulo):
 
 
 # ---------- comandos ----------
-def cmd_init(a):
+def _criar_banco():
+    """Cria o schema do banco (idempotente) e carimba a versão. O plugin traz o próprio banco."""
     con = conectar(criar=True)
     con.executescript(SCHEMA)
     con.execute("INSERT INTO controle (chave,valor) VALUES ('schema_version',?) "
                 "ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor", (SCHEMA_VERSION,))
     con.commit()
+    return con
+
+
+def cmd_init(a):
+    _criar_banco()
     print(f"OK schema em {DB} (schema_version={SCHEMA_VERSION})")
 
 
 def cmd_check(a):
+    # 1ª execução: o plugin cria o próprio banco automaticamente, isolado no config dir
+    # (APLICA_HOME / ~/.config/aplica), nunca apontando para um banco já existente na máquina.
     if not os.path.exists(DB):
-        print(f"ERRO:db-ausente {DB}")
-        sys.exit(1)
+        try:
+            _criar_banco()
+            print(f"banco criado automaticamente em {DB}")
+        except sqlite3.Error as e:
+            print(f"ERRO:db-criacao {e}")
+            sys.exit(1)
     try:
         con = conectar()
         ok = con.execute("PRAGMA integrity_check").fetchone()[0]

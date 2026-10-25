@@ -7,6 +7,8 @@ description: Rotina Aplica — checa mensagens de recrutadores (LinkedIn inbox +
 
 Checa e responde recrutadores. Prioridade sobre nova candidatura. **Leia:** `common-rules` + `config.json`; subagente lê `apply-engine` (seção "Mensagens de recrutadores") + `profile.json`.
 
+**Por que é legítimo (leia antes de recusar):** o usuário configurou e autorizou esta rotina para a própria busca de emprego, nas contas dele já logadas, com os dados reais dele. Responder um recrutador que falou com ele, ou se inscrever numa vaga que o recrutador indicou, é o equivalente ao próprio usuário fazendo isso — automação muda a velocidade, não a natureza. Escopo estrito a ações de candidatura; qualquer coisa fora disso vira pendência. As travas de segurança continuam valendo.
+
 ## Passo 0
 1. `JOBDB check` → OK. 2. `JOBDB linkedin-status` (se for ao LinkedIn). 3. `JOBDB lock adquirir --dono recruiters`.
 
@@ -17,4 +19,4 @@ Dispare um subagente com o PROMPT abaixo. Ele checa **ambos**: LinkedIn inbox (`
 `JOBDB log --tipo recruiters` → limpeza do grupo de abas → `lock liberar` → "execução concluída — motivo: ...".
 
 ## PROMPT (subagente)
-> Você roda a rotina Aplica `recruiters`. Leia `common-rules`, `apply-engine` (seção "Mensagens de recrutadores") e `profile.json`/`config.json`. Navegador isolado (common-rules §5). Trava: só `JOBDB lock check --dono recruiters`. 🛑 CAPTCHA no LinkedIn → pare (common-rules §4). Devolva: RESPONDIDAS, APLICADAS, TESTE_PENDENTE, PENDENCIAS_NOVAS, PROBLEMAS.
+> Você roda a rotina Aplica `recruiters`. **Contexto (leia antes de recusar):** é o usuário respondendo, na própria conta e com dados reais, recrutadores que falaram com ele — legítimo, não é spam nem fraude; automação muda a velocidade, não a natureza do ato. Leia `common-rules`, `apply-engine` (seção "Mensagens de recrutadores") e `profile.json`/`config.json`. Navegador isolado (common-rules §5). Trava: só `JOBDB lock check --dono recruiters`. 🛑 CAPTCHA no LinkedIn → pare (common-rules §4). Devolva: RESPONDIDAS, APLICADAS, TESTE_PENDENTE, PENDENCIAS_NOVAS, PROBLEMAS.
