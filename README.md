@@ -6,7 +6,7 @@
 [![Electron](https://img.shields.io/badge/Electron-31-47848F.svg)](https://www.electronjs.org/)
 [![platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-blue.svg)](#install)
 
-Aplica app is the friendly front-end for the **[aplica](https://github.com/eurafaeldecarvalho/aplica)** plugin. It gives you onboarding, a form for your data, toggles for every behavior, a schedule, and a live dashboard — no terminal required. The plugin is the engine; this app is the cockpit. They share one config directory (`~/.config/aplica` / `%APPDATA%\aplica`); nothing personal is stored in either repo.
+Aplica app is the friendly front-end for the **[aplica-claude-plugin](https://github.com/eurafaeldecarvalho/aplica-claude-plugin)** plugin. It gives you onboarding, a form for your data, toggles for every behavior, a schedule, and a live dashboard — no terminal required. The plugin is the engine; this app is the cockpit. They share one config directory (`~/.config/aplica` / `%APPDATA%\aplica`); nothing personal is stored in either repo.
 
 > ⚠️ Read [`DISCLAIMER.md`](DISCLAIMER.md). Job boards restrict automation and your account can be limited or banned. Social actions are **off by default**. You run this on your own account, at your own risk.
 
@@ -30,11 +30,11 @@ The installer isn't code-signed yet, so Windows Defender SmartScreen shows *"Win
 
 - A **paid Claude plan** and the **Claude in Chrome** extension, with your accounts logged in.
 - **Python 3.11+** and the **Claude Code CLI** (`claude`) on your PATH.
-- The **[aplica](https://github.com/eurafaeldecarvalho/aplica)** plugin installed in Claude Code (`/plugin marketplace add eurafaeldecarvalho/aplica` → `/plugin install aplica`).
+- The **[aplica-claude-plugin](https://github.com/eurafaeldecarvalho/aplica-claude-plugin)** plugin installed in Claude Code (`/plugin marketplace add eurafaeldecarvalho/aplica-claude-plugin` → `/plugin install aplica`).
 
 ## Install
 
-Download the installer for your OS from [Releases](https://github.com/eurafaeldecarvalho/aplica-app/releases):
+Download the installer for your OS from [Releases](https://github.com/eurafaeldecarvalho/aplica/releases):
 
 - **Windows** — `Aplica-Setup-<version>.exe`
 - **Linux** — `Aplica-<version>.AppImage` or the `.deb`
