@@ -1,14 +1,14 @@
 ---
-description: Mostra o estado do Aplica — candidaturas de hoje, relatório do dia, vagas travadas e pendências.
-argument-hint: "[AAAA-MM-DD opcional]"
+description: Show Aplica's state — today's applications, the day's report, stuck jobs and to-dos.
+argument-hint: "[YYYY-MM-DD optional]"
 ---
 
-Mostre o estado atual do Aplica usando o banco (somente leitura). Rode, na data `$ARGUMENTS` (ou hoje):
+Show Aplica's current state using the database (read-only). Run, for the date `$ARGUMENTS` (or today):
 
-- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py hoje` — candidaturas do dia (CANDIDATURAS_CONTAM exclui incertas).
-- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py relatorio` — resumo em markdown (candidaturas, log, sites bloqueados, perguntas, vagas travadas, "Precisa de você").
-- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py travada list` e `pendencia list` — o que ficou para o usuário terminar na mão.
-- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py metricas` — funil e taxa de resposta/entrevista por fonte.
-- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py followups --dias 7` — candidaturas sem retorno há 7+ dias (candidatas a follow-up).
+- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py today` — the day's applications (APPLICATIONS_COUNTED excludes uncertain).
+- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py report` — markdown summary (applications, log, blocked sites, questions, stuck jobs, "Needs you").
+- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py stuck list` and `todo list` — what is left for the user to finish by hand.
+- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py metrics` — funnel and reply/interview rate per source and per résumé variant.
+- `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py followups --days 7` — applications with no reply for 7+ days (follow-up candidates).
 
-Resuma para o usuário: quantas candidaturas, taxa por fonte, o que está travado, o que precisa da ação dele e quais vagas pedem follow-up.
+Summarize for the user: how many applications, the rate per source, which résumé variant is doing best, what is stuck, what needs their action, and which jobs are due a follow-up.

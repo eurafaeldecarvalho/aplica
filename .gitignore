@@ -1,8 +1,8 @@
-# Aplica — nunca versionar dados do usuário nem artefatos locais.
-# A instância do usuário vive no config dir do SO (~/.config/aplica | %APPDATA%\aplica),
-# fora do repo. Estes padrões são uma rede de segurança caso alguém copie dados para cá.
+# Aplica — never version user data or local artifacts.
+# The user's instance lives in the OS config dir (~/.config/aplica | %APPDATA%\aplica),
+# outside the repo. These patterns are a safety net in case someone copies data here.
 
-# dados do usuário / estado
+# user data / state
 config.json
 profile.json
 answers.md
@@ -15,9 +15,10 @@ state.db-wal
 backups/
 logs/
 tmp/
-visao/
+views/
+drafts/
 
-# currículo / foto / documentos pessoais
+# résumé / photo / personal documents
 resume.pdf
 photo.*
 *.pdf
@@ -28,7 +29,7 @@ __pycache__/
 .venv/
 venv/
 
-# SO / editor
+# OS / editor
 .DS_Store
 Thumbs.db
 .idea/

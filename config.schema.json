@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/eurafaeldecarvalho/aplica-claude-plugin/config.schema.json",
   "title": "Aplica config.json",
-  "description": "Settings/toggles/alvo/fontes/agenda de uma instância do Aplica. Contrato compartilhado entre o motor (plugin) e o app desktop. Dados pessoais do candidato ficam em profile.json.",
+  "description": "Settings/toggles/target/sources/schedule for an Aplica instance. Shared contract between the engine (plugin) and the desktop app. The candidate's personal data lives in profile.json.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version"],
@@ -10,20 +10,20 @@
     "schema_version": { "type": "integer", "const": 1 },
     "target": {
       "type": "object",
-      "description": "Perfil-alvo e knockouts. Vira regex nos scanners (engine/filtros.py).",
+      "description": "Target profile and knockouts. Compiled into regexes by the scanners (engine/filters.py).",
       "additionalProperties": false,
       "properties": {
-        "titles_search": { "type": "array", "items": { "type": "string" }, "description": "Termos de busca nos boards/LinkedIn." },
-        "title_ok": { "type": "string", "description": "Regex (case-insensitive) de título aceito." },
-        "title_bad": { "type": "string", "description": "Regex de título barrado (knockout)." },
-        "stack_target": { "type": "string", "description": "Regex da stack-alvo." },
-        "stack_out": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Mapa nome->regex de stacks que, como linguagem principal, eliminam a vaga." },
-        "geo_allow": { "type": "array", "items": { "type": "string" }, "description": "Palavras de local aceito. Vazio = aceita qualquer local." },
-        "geo_block": { "type": "array", "items": { "type": "string" }, "description": "Palavras de local/mercado barrado." },
-        "company_block": { "type": "array", "items": { "type": "string" }, "description": "Empresas/recrutadores a nunca aplicar (knockout por nome)." },
+        "titles_search": { "type": "array", "items": { "type": "string" }, "description": "Search terms used on boards/LinkedIn." },
+        "title_ok": { "type": "string", "description": "Accepted-title regex (case-insensitive)." },
+        "title_bad": { "type": "string", "description": "Blocked-title regex (knockout)." },
+        "stack_target": { "type": "string", "description": "Target-stack regex." },
+        "stack_out": { "type": "object", "additionalProperties": { "type": "string" }, "description": "name->regex map of stacks that, as the main language, knock the job out." },
+        "geo_allow": { "type": "array", "items": { "type": "string" }, "description": "Accepted-location words. Empty = accept any location." },
+        "geo_block": { "type": "array", "items": { "type": "string" }, "description": "Blocked location/market words." },
+        "company_block": { "type": "array", "items": { "type": "string" }, "description": "Companies/recruiters to never apply to (name knockout)." },
         "work_language": { "type": "array", "items": { "type": "string" } },
-        "language_required_block": { "type": "string", "description": "Regex: idioma obrigatório que elimina a vaga." },
-        "home_city": { "type": "string", "description": "Cidade do usuário; presencial/híbrido só é aceito aqui." },
+        "language_required_block": { "type": "string", "description": "Regex: a required language that knocks the job out." },
+        "home_city": { "type": "string", "description": "The user's city; on-site/hybrid is only accepted here." },
         "work_modes": {
           "type": "object",
           "additionalProperties": false,
@@ -32,15 +32,22 @@
             "hybrid": { "type": "boolean" },
             "onsite": { "type": "boolean" }
           }
-        }
+        },
+        "ghost_max": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Ghost-job score (0-100) at or above which a posting is skipped. Default 60." },
+        "linkedin_locations": {
+          "type": "array",
+          "description": "LinkedIn search locations, each [location, label] (or a bare string). Default: global + remote.",
+          "items": { "type": "array", "items": { "type": "string" } }
+        },
+        "freehire_queries": { "type": "array", "items": { "type": "string" }, "description": "Override the freehire search terms (default: derived from titles_search)." }
       }
     },
     "behavior": {
       "type": "object",
-      "description": "Toggles de comportamento. Defaults conservadores (social OFF).",
+      "description": "Behavior toggles. Conservative defaults (social OFF).",
       "additionalProperties": false,
       "properties": {
-        "feed_mode": { "enum": ["full", "apply_only", "off"], "description": "Feed do LinkedIn. OFF por padrão (maior risco de restrição de conta)." },
+        "feed_mode": { "enum": ["full", "apply_only", "off"], "description": "LinkedIn feed. OFF by default (highest account-restriction risk)." },
         "social": {
           "type": "object",
           "additionalProperties": false,
@@ -51,16 +58,16 @@
             "like": { "type": "boolean" }
           }
         },
-        "im_interested": { "type": "boolean", "description": "Clicar 'I'm interested' na página da empresa (fit alto)." },
-        "email_resume": { "type": "boolean", "description": "Enviar currículo por e-mail quando o recrutador/post pedir." },
-        "email_summary": { "type": "boolean", "description": "Enviar o resumo diário por e-mail para o próprio usuário (rotina summary)." },
-        "sso_google": { "type": "boolean", "description": "Usar 'Continuar com Google' em sites novos." },
-        "create_account": { "type": "boolean", "description": "Criar conta nova em sites sem SSO." }
+        "im_interested": { "type": "boolean", "description": "Click 'I'm interested' on the company page (high fit)." },
+        "email_resume": { "type": "boolean", "description": "Email the résumé when a recruiter/post asks for it." },
+        "email_summary": { "type": "boolean", "description": "Email the daily summary to the user themselves (summary routine)." },
+        "sso_google": { "type": "boolean", "description": "Use 'Continue with Google' on new sites." },
+        "create_account": { "type": "boolean", "description": "Create a new account on sites without SSO." }
       }
     },
     "caps": {
       "type": "object",
-      "description": "Tetos e cadência (anti-detecção). Aplicados por script, não 'de cabeça'.",
+      "description": "Caps and cadence (anti-detection). Enforced by script, not 'in the head'.",
       "additionalProperties": false,
       "properties": {
         "applications_per_day": { "type": "integer", "minimum": 0 },
@@ -73,24 +80,24 @@
         "cadence_seconds": {
           "type": "array", "items": { "type": "integer", "minimum": 0 },
           "minItems": 2, "maxItems": 2,
-          "description": "[min, max] de segundos entre candidaturas (intervalo irregular)."
+          "description": "[min, max] seconds between applications (irregular interval)."
         },
         "active_hours": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Janela de horário humano (HH:MM). Vazio = sem restrição.",
+          "description": "Human-hours window (HH:MM). Empty = no restriction.",
           "properties": { "start": { "type": "string" }, "end": { "type": "string" } }
         }
       }
     },
     "sources": {
       "type": "object",
-      "description": "Fontes ligadas/desligadas.",
+      "description": "Sources on/off.",
       "additionalProperties": { "type": "boolean" }
     },
     "schedule": {
       "type": "object",
-      "description": "Horários das rotinas (HH:MM, 24h) e se estão ligadas.",
+      "description": "Routine times (HH:MM, 24h) and whether they are on.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
@@ -102,7 +109,7 @@
     },
     "current_employer": {
       "type": "array", "items": { "type": "string" },
-      "description": "Empregador atual (nunca sinalizar interesse nele)."
+      "description": "Current employer (never signal interest there)."
     },
     "paths": {
       "type": "object",
@@ -110,6 +117,28 @@
       "properties": {
         "resume": { "type": "string" },
         "photo": { "type": "string" }
+      }
+    },
+    "resume_variants": {
+      "type": "array",
+      "description": "Résumé variants. The agent attaches the best-matching one per job; falls back to paths.resume.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "file", "keywords"],
+        "properties": {
+          "name": { "type": "string", "description": "Short label stored on each application for the metrics breakdown." },
+          "file": { "type": "string", "description": "PDF path (relative to the config dir, or absolute)." },
+          "keywords": { "type": "string", "description": "Regex matched against the job title + description; most hits wins." }
+        }
+      }
+    },
+    "app": {
+      "type": "object",
+      "description": "Desktop-app-only settings (ignored by the engine).",
+      "additionalProperties": false,
+      "properties": {
+        "desktop_notifications": { "type": "boolean", "description": "Show native desktop notifications for new blocks/to-dos/stuck jobs." }
       }
     }
   }

@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
-# Aplica — travas de segurança por SCRIPT (não "de cabeça"). O LLM conta errado em contexto
-# longo, e esta é a trava que não pode falhar. O SKILL.md chama este script a cada lote e OBEDECE
-# a saída. Se o script e o placar mental divergirem, o SCRIPT vence (conta o banco real).
-# Tetos vêm de config.json (caps.applications_per_day, caps.max_batches).
+# Aplica — safety caps enforced by SCRIPT (not "in the head"). The LLM miscounts in long contexts,
+# and this is the guard that cannot fail. The SKILL.md calls this script before every batch and
+# OBEYS its output. If the script and the mental tally disagree, the SCRIPT wins (it counts the real DB).
+# Caps come from config.json (caps.applications_per_day, caps.max_batches).
 #
-# Uso:  python caps.py --lote <n> --candidaturas <total_hoje>
-# Saída (última linha, parseável): CONTINUAR | PARAR:lote-max | PARAR:teto-candidaturas | PARAR:db-indisponivel
+# Usage:  python caps.py --batch <n> --applications <total_today>
+# Output (last line, parseable): CONTINUE | STOP:max-batches | STOP:daily-cap | STOP:db-unavailable | STOP:invalid-config
 import argparse, datetime, sqlite3
 import config
 import jobdb
 
 
-def conta_hoje(hoje_iso):
-    # incertas não contam no teto (regra do SKILL.md)
-    con = jobdb.conectar(somente_leitura=True)
-    return con.execute("SELECT COUNT(*) FROM candidaturas WHERE data=? AND status<>'incerta'", (hoje_iso,)).fetchone()[0]
+def count_today(day_iso):
+    # uncertain applications do not count toward the cap (SKILL.md rule)
+    con = jobdb.connect(read_only=True)
+    return con.execute("SELECT COUNT(*) FROM applications WHERE date=? AND status<>'uncertain'", (day_iso,)).fetchone()[0]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--lote", type=int, required=True)
-    ap.add_argument("--candidaturas", type=int, required=True, help="total de candidaturas de hoje pelo placar do orquestrador")
-    ap.add_argument("--data", default=None, help="AAAA-MM-DD; default = hoje")
+    ap.add_argument("--batch", type=int, required=True)
+    ap.add_argument("--applications", type=int, required=True, help="today's applications per the orchestrator's tally")
+    ap.add_argument("--date", default=None, help="YYYY-MM-DD; default = today")
     args = ap.parse_args()
 
-    # A trava nunca pode dar traceback: config malformado falha-FECHADO (PARAR), nunca "open".
+    # The guard must never traceback: a malformed config fails CLOSED (STOP), never open.
     try:
         caps = config.load_config().get("caps") or {}
 
@@ -32,32 +32,32 @@ def main():
             v = caps.get(k, d)
             return int(v) if v is not None else d
 
-        teto_candidaturas = _cap_int("applications_per_day", 15)
-        max_lotes = _cap_int("max_batches", 10)
+        daily_cap = _cap_int("applications_per_day", 15)
+        max_batches = _cap_int("max_batches", 10)
     except Exception as e:
-        print(f"PARAR:config-invalida ({e})")
+        print(f"STOP:invalid-config ({e})")
         return
 
-    hoje = args.data or datetime.date.today().isoformat()
+    day = args.date or datetime.date.today().isoformat()
     try:
-        banco_n = conta_hoje(hoje)
+        db_n = count_today(day)
     except (sqlite3.Error, SystemExit):
-        print("PARAR:db-indisponivel")
+        print("STOP:db-unavailable")
         return
 
-    # O teto usa o MAIOR entre o placar e a contagem do banco (conservador: nunca estourar sem perceber).
-    efetivo = max(args.candidaturas, banco_n)
+    # The cap uses the HIGHER of the tally and the DB count (conservative: never overshoot unnoticed).
+    effective = max(args.applications, db_n)
 
-    print(f"# data={hoje} lote={args.lote}/{max_lotes} candidaturas_placar={args.candidaturas} "
-          f"banco_hoje={banco_n} efetivo={efetivo}/{teto_candidaturas}")
+    print(f"# date={day} batch={args.batch}/{max_batches} applications_tally={args.applications} "
+          f"db_today={db_n} effective={effective}/{daily_cap}")
 
-    if args.lote >= max_lotes:
-        print("PARAR:lote-max")
+    if args.batch >= max_batches:
+        print("STOP:max-batches")
         return
-    if efetivo >= teto_candidaturas:
-        print("PARAR:teto-candidaturas")
+    if effective >= daily_cap:
+        print("STOP:daily-cap")
         return
-    print("CONTINUAR")
+    print("CONTINUE")
 
 
 if __name__ == "__main__":

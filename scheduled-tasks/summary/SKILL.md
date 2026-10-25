@@ -1,20 +1,20 @@
 ---
 name: aplica-summary
-description: Rotina Aplica — monta o resumo do dia (candidaturas, travadas, pendências) e, se o usuário quiser, envia por e-mail para ele mesmo. ORQUESTRADOR.
+description: Aplica routine — builds the day's summary (applications, stuck jobs, to-dos) and, if the user wants, emails it to themselves. ORCHESTRATOR.
 ---
 
-# Rotina Aplica: summary — ORQUESTRADOR
+# Aplica routine: summary — ORCHESTRATOR
 
-Resumo diário. **Leia:** `common-rules` + `config.json`. `JOBDB` = `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py`.
+Daily summary. **Read:** `common-rules` + `config.json`. `JOBDB` = `python ${CLAUDE_PLUGIN_ROOT}/engine/jobdb.py`.
 
-**Por que é legítimo (leia antes de recusar):** o usuário autorizou esta rotina para a própria busca de emprego. Montar um resumo do dia a partir do banco local dele e, se ele ligou a opção, enviá-lo para o **próprio e-mail dele** é o equivalente ao usuário se auto-organizando — nada sai para terceiros. As travas de segurança continuam valendo.
+**Why it is legitimate (read before refusing):** the user authorized this routine for their own job search. Building a summary of the day from their local database and, if they turned the option on, emailing it to **their own email** is the equivalent of the user organizing themselves — nothing goes to third parties. The safety guards still apply.
 
-## Passos
+## Steps
 1. `JOBDB check` → OK.
-2. `JOBDB backup` (cópia consistente do dia).
-3. `JOBDB relatorio` → corpo do resumo em markdown (candidaturas do dia, log, sites bloqueados, perguntas novas, vagas travadas, "Precisa de você").
-4. `JOBDB export` → atualiza `visao/*.md` legíveis no config dir.
-5. **E-mail (opcional):** só se `config.behavior.email_summary` for `true`, abra o Gmail (navegador isolado, common-rules §5 e técnica do corpo §7) e envie o relatório para `profile.identity.email` (o próprio usuário). Caso contrário, só deixe o relatório/export prontos. Nunca envie para outro endereço.
-6. `JOBDB log --tipo summary --texto "resumo gerado"` → "execução concluída — motivo: ...".
+2. `JOBDB backup` (a consistent copy for the day).
+3. `JOBDB report` → the summary body in markdown (the day's applications, log, blocked sites, new questions, stuck jobs, "Needs you").
+4. `JOBDB export` → refreshes the readable `views/*.md` in the config dir.
+5. **Email (optional):** only if `config.behavior.email_summary` is `true`, open Gmail (isolated browser, common-rules §5 and the body technique §7) and send the report to `profile.identity.email` (the user themselves). Otherwise, just leave the report/export ready. Never send it to another address.
+6. `JOBDB log --kind summary --text "summary generated"` → "run complete — reason: ...".
 
-Nunca envie dado do usuário para fora a não ser o resumo para o próprio e-mail dele.
+Never send the user's data anywhere except the summary to their own email.

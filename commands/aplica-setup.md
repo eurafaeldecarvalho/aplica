@@ -1,5 +1,5 @@
 ---
-description: Configura (ou reconfigura) a instância do Aplica — cria config dir, config.json, profile.json e inicializa o banco.
+description: Configure (or reconfigure) the Aplica instance — create the config dir, config.json, profile.json and initialize the database.
 ---
 
-Invoque a skill `setup-wizard` e conduza o usuário pela configuração do Aplica: localizar o config dir, preencher `config.json` (perfil-alvo e toggles — social OFF por padrão), preencher `profile.json` com os dados REAIS do usuário, criar `answers.md`, posicionar currículo/foto, validar contra os schemas e rodar `jobdb.py init` + `check`. Leia o `DISCLAIMER.md` com o usuário.
+Invoke the `setup-wizard` skill and walk the user through configuring Aplica: locate the config dir, fill `config.json` (target profile and toggles — social OFF by default), fill `profile.json` with the user's REAL data, create `answers.md`, place the résumé/photo (and any `resume_variants`), validate against the schemas and run `jobdb.py init` + `check`. Read `DISCLAIMER.md` with the user.

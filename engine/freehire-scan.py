@@ -1,124 +1,129 @@
 #!/usr/bin/env python3
-# Aplica — busca vagas no agregador freehire.me (API pública JSON, ~50 ATS), aplica dedup +
-# knockouts do config e devolve as que valem abrir. Mesma saída dos outros scans.
+# Aplica — finds jobs on the freehire.me aggregator (public JSON API, ~50 ATSs), applies dedup +
+# config knockouts + the ghost-job check and returns the ones worth opening. Same output as the other scans.
 #
-# Uso: python freehire-scan.py [--dias 3] [--paginas 3] [--min-fit 70]
-# Saída: FH|empresa|título|local|url|fit=NN  + linha de resumo.
-# Exit 0 = ok · 4 = API indisponível (a rotina só pula esta fonte).
+# Usage: python freehire-scan.py [--days 3] [--pages 3] [--min-fit 70]
+# Output: FH|company|title|location|url|fit=NN|ghost=NN  + a summary line.
+# Exit 0 = ok · 4 = SOURCE_UNAVAILABLE (the routine just skips this source).
 #
-# Termos de busca e skills-alvo saem do config (target.titles_search / target.stack_target).
+# Search terms and target skills come from the config (target.titles_search / target.stack_target).
 import argparse, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
-import filtros, jobdb
+import filters, jobdb
 import config
 
 BASE = os.environ.get("FREEHIRE_API_URL", "https://freehire.me")
 _T = config.load_config().get("target") or {}
-# termos de busca: primeiras palavras dos títulos-alvo, minúsculas, deduplicadas
-BUSCAS = _T.get("freehire_queries") or [s.split()[-1].lower() for s in (_T.get("titles_search") or ["developer"]) if s.split()][:4] or ["developer"]
-# skills-alvo: extrai palavras alfanuméricas do regex stack_target do config
-ALVO_SKILLS = {w.lower() for w in re.findall(r"[a-zA-Z][a-zA-Z0-9.]+", _T.get("stack_target") or "") if len(w) > 1}
-IDIOMAS_OK = {l[:2].lower() for l in (_T.get("work_language") or ["english", "portuguese"])} | {None, ""}
+# search terms: last word of each target title, lowercase, deduplicated
+SEARCHES = _T.get("freehire_queries") or list(dict.fromkeys(s.split()[-1].lower() for s in (_T.get("titles_search") or ["developer"]) if s.split()))[:4] or ["developer"]
+# target skills: alphanumeric words pulled from the config's stack_target regex
+TARGET_SKILLS = {w.lower() for w in re.findall(r"[a-zA-Z][a-zA-Z0-9.]+", _T.get("stack_target") or "") if len(w) > 1}
 _LANG_CODE = {"english": "en", "portuguese": "pt", "ingles": "en", "portugues": "pt", "spanish": "es"}
-IDIOMAS_OK |= {_LANG_CODE.get(l.lower(), l[:2].lower()) for l in (_T.get("work_language") or [])}
+LANGS_OK = {_LANG_CODE.get(l.lower(), l[:2].lower()) for l in (_T.get("work_language") or ["english", "portuguese"])} | {None, ""}
 
 
-def busca(params):
+def search(params):
     url = f"{BASE}/api/v1/agent/jobs/search?" + urllib.parse.urlencode(params, doseq=True)
-    for tentativa in range(3):
+    for attempt in range(3):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "aplica/1.0"}), timeout=30) as r:
                 try:
                     return json.load(r)
                 except ValueError as e:
-                    # resposta não-JSON (HTML de WAF/erro com status 200) → fonte indisponível, não crash
-                    raise ConnectionError(f"freehire respondeu não-JSON: {e}") from e
+                    # non-JSON response (WAF/error HTML with status 200) → source unavailable, not a crash
+                    raise ConnectionError(f"freehire returned non-JSON: {e}") from e
         except urllib.error.HTTPError as e:
             if e.code == 429 or e.code >= 500:
-                time.sleep(5 * (tentativa + 1))
+                time.sleep(5 * (attempt + 1))
                 continue
-            # 4xx (403/404/etc.) não é recuperável → trata como fonte indisponível (exit 4), não exit 1
+            # 4xx (403/404/etc.) is not recoverable → source unavailable (exit 4), not exit 1
             raise ConnectionError(f"freehire HTTP {e.code}: {url[:120]}") from e
         except (urllib.error.URLError, TimeoutError):
-            time.sleep(5 * (tentativa + 1))
-    raise ConnectionError(f"freehire indisponível: {url[:120]}")
+            time.sleep(5 * (attempt + 1))
+    raise ConnectionError(f"freehire unavailable: {url[:120]}")
 
 
-def texto_limpo(s):
+def clean_text(s):
     import html
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
 
 
-def avaliar(j):
-    """(passa, motivo) para uma vaga do freehire, antes do dedup."""
-    titulo, local = j.get("title") or "", j.get("location") or ""
-    if not filtros.titulo_passa(titulo):
-        return False, "título"
-    if not filtros.empresa_passa(j.get("company") or ""):
-        return False, "empresa-bloqueada"
-    if not filtros.local_passa(local):
-        return False, "local"
+def evaluate(j):
+    """(passes, reason) for a freehire job, before dedup."""
+    title, loc = j.get("title") or "", j.get("location") or ""
+    if not filters.title_ok(title):
+        return False, "title"
+    if not filters.company_ok(j.get("company") or ""):
+        return False, "blocked-company"
+    if not filters.location_ok(loc):
+        return False, "location"
     enr = j.get("enrichment") or {}
-    if IDIOMAS_OK and enr.get("posting_language") not in IDIOMAS_OK:
-        return False, "idioma"
-    if (j.get("reality") or {}).get("fake_freshness"):
-        return False, "falsa novidade"
+    if LANGS_OK and enr.get("posting_language") not in LANGS_OK:
+        return False, "language"
     skills = {s.lower() for s in (j.get("skills") or [])}
-    if ALVO_SKILLS and skills and not skills & ALVO_SKILLS:
+    if TARGET_SKILLS and skills and not skills & TARGET_SKILLS:
         return False, "stack"
-    motivo = filtros.knockout_descricao(texto_limpo(j.get("description")), local)
-    if motivo:
-        return False, "descrição"
+    if filters.description_knockout(clean_text(j.get("description")), loc):
+        return False, "description"
     return True, ""
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dias", type=int, default=3)
-    ap.add_argument("--paginas", type=int, default=3, help="páginas de 50 por busca")
+    ap.add_argument("--days", type=int, default=3)
+    ap.add_argument("--pages", type=int, default=3, help="pages of 50 per search")
     ap.add_argument("--min-fit", type=int, default=70)
     a = ap.parse_args()
 
-    con = jobdb.conectar(somente_leitura=True)
-    vistas = jobdb.urls_vistas(con)
-    vistos, aprovadas, cont, total = set(), [], {}, 0
+    con = jobdb.connect()
+    seen_db = jobdb.seen_urls(con)
+    seen, approved, cut, total = set(), [], {}, 0
     try:
-        for q in BUSCAS:
-            for pag in range(a.paginas):
-                d = busca({"q": q, "limit": 50, "offset": pag * 50, "posted_within_days": a.dias,
-                           "work_mode": "remote", "description_format": "text"})
-                itens = d.get("data") or []
-                total += len(itens)
-                for j in itens:
+        for q in SEARCHES:
+            for page in range(a.pages):
+                d = search({"q": q, "limit": 50, "offset": page * 50, "posted_within_days": a.days,
+                            "work_mode": "remote", "description_format": "text"})
+                items = d.get("data") or []
+                total += len(items)
+                for j in items:
                     url = j.get("url") or ""
-                    if url in vistos:
+                    if url in seen:
                         continue
-                    vistos.add(url)
-                    ok, motivo = avaliar(j)
+                    seen.add(url)
+                    ok, reason = evaluate(j)
                     if not ok:
-                        cont[motivo] = cont.get(motivo, 0) + 1
+                        cut[reason] = cut.get(reason, 0) + 1
                         continue
-                    if jobdb.norm_url(url) in vistas or jobdb.dedup(con, url, j.get("company"), j.get("title")) != "NOVA":
-                        cont["já vista"] = cont.get("já vista", 0) + 1
+                    jobdb.record_seen(con, j.get("company"), j.get("title"), url)
+                    if jobdb.norm_url(url) in seen_db or jobdb.dedup(con, url, j.get("company"), j.get("title")) != "NEW":
+                        cut["already seen"] = cut.get("already seen", 0) + 1
                         continue
-                    idade = (j.get("reality") or {}).get("age_days")
+                    reality = j.get("reality") or {}
+                    age = reality.get("age_days")
+                    desc = clean_text(j.get("description"))
+                    times, span = jobdb.seen_stats(con, j.get("company"), j.get("title"))
+                    ghost = filters.ghost_score(title=j.get("title"), text=desc, age_days=age, times_seen=times,
+                                                seen_span_days=span, fake_freshness=bool(reality.get("fake_freshness")))
+                    if ghost >= filters.GHOST_MAX:
+                        cut["ghost"] = cut.get("ghost", 0) + 1
+                        continue
                     loc = j.get("location") or "/".join(j.get("regions") or [])
-                    fit = filtros.nota_fit(j.get("title"), loc + " " + " ".join(j.get("regions") or []), idade,
-                                           texto_limpo(j.get("description")))
-                    aprovadas.append((fit, j, loc))
-                if len(itens) < 50:
+                    fit = filters.fit_score(j.get("title"), loc + " " + " ".join(j.get("regions") or []), age, desc)
+                    approved.append((fit, ghost, j, loc))
+                if len(items) < 50:
                     break
     except ConnectionError as e:
         if not total:
-            print(f"FONTE_INDISPONIVEL: {e}")
+            print(f"SOURCE_UNAVAILABLE: {e}")
             sys.exit(4)
-        cont["erro parcial"] = 1
+        cut["partial error"] = 1
+    con.commit()
 
-    aprovadas.sort(key=lambda t: -t[0])
-    mostradas = [t for t in aprovadas if t[0] >= a.min_fit]
-    for fit, j, loc in mostradas:
-        print(f"FH|{j.get('company')}|{j.get('title')}|{loc}|{j.get('url')}|fit={fit}"[:300])
-    print(f"# freehire: {total} resultados ({len(vistos)} únicos) | cortadas: "
-          + ", ".join(f"{k} {v}" for k, v in sorted(cont.items())) + f" | para aplicar (fit>={a.min_fit}): {len(mostradas)}")
+    approved.sort(key=lambda t: -t[0])
+    shown = [t for t in approved if t[0] >= a.min_fit]
+    for fit, ghost, j, loc in shown:
+        print(f"FH|{j.get('company')}|{j.get('title')}|{loc}|{j.get('url')}|fit={fit}|ghost={ghost}"[:320])
+    print(f"# freehire: {total} results ({len(seen)} unique) | cut: "
+          + (", ".join(f"{k} {v}" for k, v in sorted(cut.items())) or "none") + f" | to apply (fit>={a.min_fit}): {len(shown)}")
 
 
 if __name__ == "__main__":

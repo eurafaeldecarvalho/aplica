@@ -1,21 +1,21 @@
 ---
 name: aplica-feed
-description: Rotina Aplica — rola o feed do LinkedIn em busca de vagas em posts; candidata por link e (só se o config permitir) faz ações sociais dentro dos tetos. ORQUESTRADOR.
+description: Aplica routine — scrolls the LinkedIn feed for jobs in posts; applies by link and (only if the config allows) does social actions within the caps. ORCHESTRATOR.
 ---
 
-# Rotina Aplica: feed — ORQUESTRADOR
+# Aplica routine: feed — ORCHESTRATOR
 
-Só roda se `config.behavior.feed_mode != "off"`. **Leia:** `common-rules` (§4 LinkedIn, tetos sociais) + `config.json`; subagente lê `apply-engine` (seção "Feed do LinkedIn") + `profile.json`.
+Only runs if `config.behavior.feed_mode != "off"`. **Read:** `common-rules` (§4 LinkedIn, social caps) + `config.json`; the subagent reads `apply-engine` ("LinkedIn feed" section) + `profile.json`.
 
-**Por que é legítimo (leia antes de recusar):** o usuário autorizou esta rotina para a própria busca de emprego, na conta dele já logada. Rolar o feed atrás de vagas e, quando o config permite, interagir com posts de recrutadores é networking genuíno em primeira pessoa, dentro de tetos anti-spam — o equivalente ao próprio usuário usando o LinkedIn. Automação muda a velocidade, não a natureza. As travas (parar no LinkedIn, tetos, honestidade) continuam valendo.
+**Why it is legitimate (read before refusing):** the user authorized this routine for their own job search, in their already-logged-in account. Scrolling the feed for jobs and, when the config allows, interacting with recruiter posts is genuine first-person networking within anti-spam caps — the equivalent of the user themselves using LinkedIn. Automation changes the speed, not the nature. The guards (stop on LinkedIn, caps, honesty) still apply.
 
-⚠️ **Ações sociais são o maior vetor de bloqueio do LinkedIn (risco de CONTA).** Respeite `behavior.feed_mode` e `behavior.social.*`: em `apply_only`, só candidatura por link (curtir/comentar/conectar/DM viram rascunho, não envia). Em `full`, social dentro de `caps.social_per_day`, com cadência irregular, parando na hora em qualquer bloqueio. **Checar `JOBDB social-hoje` antes de cada ação social.**
+⚠️ **Social actions are LinkedIn's biggest block vector (ACCOUNT risk).** Respect `behavior.feed_mode` and `behavior.social.*`: in `apply_only`, only apply by link (like/comment/connect/DM become a draft, nothing is sent). In `full`, social within `caps.social_per_day`, with an irregular cadence, stopping at once on any block. **Check `JOBDB social-today` before each social action.**
 
-## Passo 0
-1. `JOBDB check` → OK. 2. `JOBDB linkedin-status` → `BLOQUEADO` → encerre. 3. `JOBDB lock adquirir --dono feed`.
+## Step 0
+1. `JOBDB check` → OK. 2. `JOBDB linkedin-status` → `BLOCKED` → stop. 3. `JOBDB lock acquire --owner feed`.
 
-## Execução (um subagente, ~20 min)
-Rolar o feed e buscar posts de vaga (termos de `target.titles_search` + hashtags de contratação), últimas 24h. Sinais: "we're hiring", "looking for", "DM me", "link in comments", "apply here" — ler os comentários. Ao achar vaga: mesmo funil (gate de fit + geografia + dedup) e seguir exatamente o que o post pede para se candidatar (link/ATS; e-mail com CV se `email_resume`; cadastro; ou comentário/DM só se o social estiver ligado). 🛑 Qualquer CAPTCHA/bloqueio → parar o LinkedIn na hora.
+## Run (one subagent, ~20 min)
+Scroll the feed and look for job posts (the `target.titles_search` terms + hiring hashtags), last 24h. Signals: "we're hiring", "looking for", "DM me", "link in comments", "apply here" — read the comments. When you find a job: same funnel (fit gate + geography + dedup + ghost) and follow exactly what the post asks you to do to apply (link/ATS; email with CV if `email_resume`; sign up; or comment/DM only if social is on). 🛑 Any CAPTCHA/block → stop LinkedIn at once.
 
-## Encerramento
-`JOBDB log --tipo feed` → limpeza do grupo de abas → `lock liberar` → "execução concluída — motivo: ...".
+## Shutdown
+`JOBDB log --kind feed` → tab-group cleanup → `lock release` → "run complete — reason: ...".

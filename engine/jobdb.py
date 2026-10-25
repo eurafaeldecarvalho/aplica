@@ -1,30 +1,34 @@
 #!/usr/bin/env python3
-# Aplica — banco do motor de candidatura (SQLite). Única porta de escrita dos agentes:
-# nunca editar o .db na mão. Caminhos, tetos e empregador atual vêm de config.py (config.json
-# do usuário). Ajuda: python jobdb.py -h  |  python jobdb.py <comando> -h
-import argparse, datetime, io, os, re, sqlite3, sys, unicodedata
+# Aplica — the apply engine's database (SQLite). The agents' only write path:
+# never edit the .db by hand. Paths, caps and current employer come from config.py (the user's
+# config.json). Help: python jobdb.py -h  |  python jobdb.py <command> -h
+import argparse, datetime, io, json, os, re, sqlite3, sys, unicodedata
 import config
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 DB = config.DB
 BACKUPS = config.BACKUPS
 KEEP_BACKUPS = 30
-# Versão do schema do state.db. Carimbada na tabela `controle` no init e conferida no check —
-# detecta drift se um banco criado por uma versão antiga do motor for aberto por uma mais nova.
-SCHEMA_VERSION = "1"
+# state.db schema version. Stamped in the `control` table on init and verified on check —
+# detects drift when a database created by an older engine is opened by a newer one.
+# v1 = original Portuguese schema (migrated automatically), v2 = English schema.
+SCHEMA_VERSION = "2"
 
-STATUS_CAND = ("aplicada", "incerta", "teste-pendente", "em-processo", "entrevista",
-               "rejeitada", "sem-retorno", "oferta", "desistiu")
-MOTIVOS_SITE = ("linkedin-bloqueio", "2fa-celular", "captcha-persistente", "email-nao-chegou",
-                "sso-google-indisponivel", "cadastro-rejeitado", "conta-ja-existe-senha-invalida",
-                "bloqueio-regional", "site-fora-do-ar", "exige-documento", "paywall-assinatura", "outro")
-STATUS_SITE = ("bloqueado", "resolvido", "descartado")
-STATUS_PERG = ("pendente", "respondida", "migrada")
-CANAIS = ("linkedin-dm", "linkedin-conexao", "linkedin-comentario", "linkedin-interesse", "email", "outro")
-# Vaga que o agente não conseguiu terminar e o usuário termina na mão. Nunca guardar o VALOR de
-# documento/senha — só que o campo existe.
-TIPOS_TRAVADA = ("cpf-rg", "documento", "senha-login", "cadastro-novo", "2fa", "captcha", "pagamento", "julgamento", "outro")
-STATUS_TRAVADA = ("aberta", "feita", "descartada")
+APP_STATUS = ("applied", "uncertain", "test-pending", "in-process", "interview",
+              "rejected", "no-reply", "offer", "withdrawn")
+SITE_REASONS = ("linkedin-block", "2fa-phone", "captcha-persistent", "email-not-received",
+                "google-sso-unavailable", "signup-rejected", "account-exists-bad-password",
+                "regional-block", "site-down", "document-required", "paywall", "other")
+SITE_STATUS = ("blocked", "resolved", "dismissed")
+QUESTION_STATUS = ("pending", "answered", "migrated")
+CHANNELS = ("linkedin-dm", "linkedin-connect", "linkedin-comment", "linkedin-interest", "email", "call", "meeting", "other")
+# A job the agent could not finish and the user finishes by hand. Never store the VALUE of a
+# document/password — only that the field exists.
+STUCK_KINDS = ("national-id", "document", "password-login", "new-account", "2fa", "captcha", "payment", "judgment", "other")
+OPEN_STATUS = ("open", "done", "dismissed")
+DRAFT_KINDS = ("cover-letter", "follow-up", "interview-prep")
+DRAFT_STATUS = ("draft", "sent", "archived")
+POST_STATUS = ("draft", "approved", "published", "dismissed")
 
 
 def _in(vals):
@@ -32,167 +36,196 @@ def _in(vals):
 
 
 SCHEMA = f"""
-CREATE TABLE IF NOT EXISTS candidaturas (
+CREATE TABLE IF NOT EXISTS applications (
   id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
-  empresa TEXT NOT NULL,
-  titulo TEXT NOT NULL DEFAULT '',
-  fonte TEXT,
+  date TEXT NOT NULL,
+  company TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  source TEXT,
   url TEXT,
   url_norm TEXT,
-  chave TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN {_in(STATUS_CAND)}),
+  key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN {_in(APP_STATUS)}),
   fit INTEGER,
-  obs TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  atualizado_em TEXT
+  resume TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  updated_at TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_cand_url ON candidaturas(url_norm);
-CREATE INDEX IF NOT EXISTS ix_cand_chave ON candidaturas(chave);
-CREATE INDEX IF NOT EXISTS ix_cand_data ON candidaturas(data);
+CREATE INDEX IF NOT EXISTS ix_app_url ON applications(url_norm);
+CREATE INDEX IF NOT EXISTS ix_app_key ON applications(key);
+CREATE INDEX IF NOT EXISTS ix_app_date ON applications(date);
 
-CREATE TABLE IF NOT EXISTS descartes (
+CREATE TABLE IF NOT EXISTS discards (
   id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
-  empresa TEXT NOT NULL,
-  titulo TEXT NOT NULL DEFAULT '',
-  fonte TEXT,
+  date TEXT NOT NULL,
+  company TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  source TEXT,
   url TEXT,
   url_norm TEXT,
-  chave TEXT NOT NULL,
-  motivo TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  key TEXT NOT NULL,
+  reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
-CREATE INDEX IF NOT EXISTS ix_desc_url ON descartes(url_norm);
-CREATE INDEX IF NOT EXISTS ix_desc_chave ON descartes(chave);
+CREATE INDEX IF NOT EXISTS ix_disc_url ON discards(url_norm);
+CREATE INDEX IF NOT EXISTS ix_disc_key ON discards(key);
 
-CREATE TABLE IF NOT EXISTS vistas_legado (
+CREATE TABLE IF NOT EXISTS legacy_seen (
   url_norm TEXT PRIMARY KEY,
-  contexto TEXT
+  context TEXT
 );
 
-CREATE TABLE IF NOT EXISTS perguntas (
-  id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
-  pergunta TEXT NOT NULL,
-  pergunta_norm TEXT NOT NULL,
-  tipo_campo TEXT,
-  empresa_vaga TEXT,
-  plataforma TEXT,
+CREATE TABLE IF NOT EXISTS seen_postings (
+  key TEXT PRIMARY KEY,
+  company TEXT,
+  title TEXT,
   url TEXT,
-  resposta_agente TEXT,
-  resposta_oficial TEXT,
-  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN {_in(STATUS_PERG)}),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  first_seen TEXT NOT NULL,
+  last_seen TEXT NOT NULL,
+  times INTEGER NOT NULL DEFAULT 1
 );
-CREATE INDEX IF NOT EXISTS ix_perg_norm ON perguntas(pergunta_norm);
 
-CREATE TABLE IF NOT EXISTS sites_bloqueados (
+CREATE TABLE IF NOT EXISTS questions (
   id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
+  date TEXT NOT NULL,
+  question TEXT NOT NULL,
+  question_norm TEXT NOT NULL,
+  field_type TEXT,
+  company TEXT,
+  platform TEXT,
+  url TEXT,
+  agent_answer TEXT,
+  official_answer TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN {_in(QUESTION_STATUS)}),
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX IF NOT EXISTS ix_q_norm ON questions(question_norm);
+
+CREATE TABLE IF NOT EXISTS blocked_sites (
+  id INTEGER PRIMARY KEY,
+  date TEXT NOT NULL,
   site TEXT NOT NULL,
   url TEXT,
-  tentando TEXT,
-  motivo TEXT NOT NULL CHECK (motivo IN {_in(MOTIVOS_SITE)}),
-  detalhe TEXT,
-  tentativas INTEGER NOT NULL DEFAULT 1,
-  status TEXT NOT NULL DEFAULT 'bloqueado' CHECK (status IN {_in(STATUS_SITE)}),
-  resolucao TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  atualizado_em TEXT
+  attempting TEXT,
+  reason TEXT NOT NULL CHECK (reason IN {_in(SITE_REASONS)}),
+  detail TEXT,
+  attempts INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'blocked' CHECK (status IN {_in(SITE_STATUS)}),
+  resolution TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  updated_at TEXT
 );
 
-CREATE TABLE IF NOT EXISTS contatos (
-  id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
-  pessoa TEXT NOT NULL,
-  pessoa_norm TEXT NOT NULL,
-  empresa TEXT,
-  canal TEXT NOT NULL CHECK (canal IN {_in(CANAIS)}),
-  direcao TEXT NOT NULL CHECK (direcao IN ('enviado','recebido')),
-  resumo TEXT,
-  candidatura_id INTEGER REFERENCES candidaturas(id),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+CREATE TABLE IF NOT EXISTS people (
+  person_norm TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  company TEXT,
+  role TEXT,
+  profile_url TEXT,
+  email TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  updated_at TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_cont_pessoa ON contatos(pessoa_norm);
 
-CREATE TABLE IF NOT EXISTS pendencias (
+CREATE TABLE IF NOT EXISTS contacts (
   id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
-  descricao TEXT NOT NULL,
-  prazo TEXT,
+  date TEXT NOT NULL,
+  person TEXT NOT NULL,
+  person_norm TEXT NOT NULL,
+  company TEXT,
+  channel TEXT NOT NULL CHECK (channel IN {_in(CHANNELS)}),
+  direction TEXT NOT NULL CHECK (direction IN ('sent','received')),
+  summary TEXT,
+  application_id INTEGER REFERENCES applications(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX IF NOT EXISTS ix_contact_person ON contacts(person_norm);
+
+CREATE TABLE IF NOT EXISTS todos (
+  id INTEGER PRIMARY KEY,
+  date TEXT NOT NULL,
+  description TEXT NOT NULL,
+  due TEXT,
   url TEXT,
-  candidatura_id INTEGER REFERENCES candidaturas(id),
-  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','feita','descartada')),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  resolvido_em TEXT
+  application_id INTEGER REFERENCES applications(id),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN {_in(OPEN_STATUS)}),
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  resolved_at TEXT
 );
 
-CREATE TABLE IF NOT EXISTS travadas (
+CREATE TABLE IF NOT EXISTS stuck_jobs (
   id INTEGER PRIMARY KEY,
-  data TEXT NOT NULL,
-  tipo TEXT NOT NULL CHECK (tipo IN {_in(TIPOS_TRAVADA)}),
-  empresa TEXT,
-  titulo TEXT,
-  chave TEXT,
+  date TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN {_in(STUCK_KINDS)}),
+  company TEXT,
+  title TEXT,
+  key TEXT,
   url TEXT,
   url_norm TEXT NOT NULL DEFAULT '',
-  url_form TEXT,
+  form_url TEXT,
   site TEXT,
-  rotina TEXT,
+  routine TEXT,
   fit INTEGER,
-  etapa TEXT,
-  campos TEXT,
-  detalhe TEXT,
-  obs TEXT,
-  candidatura_id INTEGER REFERENCES candidaturas(id),
-  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN {_in(STATUS_TRAVADA)}),
-  resolucao TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  resolvido_em TEXT
+  step TEXT,
+  fields TEXT,
+  detail TEXT,
+  notes TEXT,
+  application_id INTEGER REFERENCES applications(id),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN {_in(OPEN_STATUS)}),
+  resolution TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  resolved_at TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_trav_url ON travadas(url_norm);
-CREATE INDEX IF NOT EXISTS ix_trav_chave ON travadas(chave);
+CREATE INDEX IF NOT EXISTS ix_stuck_url ON stuck_jobs(url_norm);
+CREATE INDEX IF NOT EXISTS ix_stuck_key ON stuck_jobs(key);
 
-CREATE TABLE IF NOT EXISTS controle (
-  chave TEXT PRIMARY KEY,
-  valor TEXT,
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-);
-
-CREATE TABLE IF NOT EXISTS sessao_log (
+CREATE TABLE IF NOT EXISTS drafts (
   id INTEGER PRIMARY KEY,
-  data_rodada TEXT NOT NULL,
+  date TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN {_in(DRAFT_KINDS)}),
+  application_id INTEGER REFERENCES applications(id),
+  company TEXT,
+  title TEXT,
+  path TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN {_in(DRAFT_STATUS)}),
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS control (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS run_log (
+  id INTEGER PRIMARY KEY,
+  run_date TEXT NOT NULL,
   ts TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  tipo TEXT NOT NULL,
-  texto TEXT NOT NULL
+  kind TEXT NOT NULL,
+  text TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS ix_log_data ON sessao_log(data_rodada);
-
-CREATE TABLE IF NOT EXISTS historico (
-  id INTEGER PRIMARY KEY,
-  origem TEXT NOT NULL,
-  secao TEXT,
-  texto TEXT NOT NULL
-);
+CREATE INDEX IF NOT EXISTS ix_log_date ON run_log(run_date);
 
 CREATE TABLE IF NOT EXISTS posts (
   id INTEGER PRIMARY KEY,
-  ordem INTEGER NOT NULL DEFAULT 100,
-  tema TEXT NOT NULL,
-  gancho TEXT,
-  texto TEXT NOT NULL,
-  imagem TEXT,
-  status TEXT NOT NULL DEFAULT 'rascunho' CHECK (status IN ('rascunho','aprovado','publicado','descartado')),
-  publicado_em TEXT,
+  position INTEGER NOT NULL DEFAULT 100,
+  topic TEXT NOT NULL,
+  hook TEXT,
+  text TEXT NOT NULL,
+  image TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN {_in(POST_STATUS)}),
+  published_at TEXT,
   url TEXT,
-  obs TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  atualizado_em TEXT
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  updated_at TEXT
 );
 """
-TABELAS = ("candidaturas", "descartes", "vistas_legado", "perguntas", "sites_bloqueados",
-           "contatos", "pendencias", "travadas", "controle", "sessao_log", "historico", "posts")
+TABLES = ("applications", "discards", "legacy_seen", "seen_postings", "questions", "blocked_sites", "people",
+          "contacts", "todos", "stuck_jobs", "drafts", "control", "run_log", "posts")
 
 
 # ---------- caps / config ----------
@@ -200,45 +233,49 @@ def _caps():
     return config.load_config().get("caps", {})
 
 
-def _empregador_atual():
-    """Formas normalizadas (só letras/números) do empregador atual (nunca sinalizar interesse nele)."""
+def _current_employer():
+    """Normalized forms (letters/digits only) of the current employer (never signal interest there)."""
     return [re.sub(r"[^a-z0-9]", "", slug(e)) for e in config.load_config().get("current_employer", []) if e]
 
 
-# ---------- normalização ----------
-def sem_acento(s):
+# ---------- normalization ----------
+def strip_accents(s):
     return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c))
 
 
 def slug(s):
-    return re.sub(r"[^a-z0-9]+", "-", sem_acento(s).lower()).strip("-")
+    return re.sub(r"[^a-z0-9]+", "-", strip_accents(s).lower()).strip("-")
 
 
-SENIORIDADE = re.compile(r"\b(senior|sr|pleno|ssr)\b\.?")
+SENIORITY = re.compile(r"\b(senior|sr|pleno|ssr)\b\.?")
 
 
-# Local/modalidade/contrato no título não muda a vaga — repostagens costumam só trocar isso.
-RUIDO_TITULO = re.compile(
+# Location/work mode/contract in the title does not change the job — re-posts usually only swap these.
+TITLE_NOISE = re.compile(
     r"\b(remote|remoto|remota|work from home|wfh|work|latam|latin america|americas|south america|brazil|brasil|"
     r"worldwide|global|anywhere|usa|us|canada|europe|emea|contract|contractor|freelance|pj|clt|full[ -]?time|"
     r"part[ -]?time|hybrid|hibrido|presencial|on[ -]?site|100)\b")
-RUIDO_EMPRESA = re.compile(r"\b(inc|llc|ltd|ltda|s\.?a|corp|gmbh)\b\.?")
+COMPANY_NOISE = re.compile(r"\b(inc|llc|ltd|ltda|s\.?a|corp|gmbh)\b\.?")
 
 
-def _titulo_norm(titulo):
-    t = re.sub(r"\(.*?\)|\[.*?\]", " ", sem_acento(titulo or "").lower())
-    t = SENIORIDADE.sub(" ", t)
-    return slug(RUIDO_TITULO.sub(" ", t))
+def _title_norm(title):
+    t = re.sub(r"\(.*?\)|\[.*?\]", " ", strip_accents(title or "").lower())
+    t = SENIORITY.sub(" ", t)
+    return slug(TITLE_NOISE.sub(" ", t))
 
 
-def chave(empresa, titulo):
-    emp = RUIDO_EMPRESA.sub(" ", re.sub(r"\(.*?\)", "", sem_acento(empresa or "").lower()))
-    return f"{slug(emp)}|{_titulo_norm(titulo)}"
+def job_key(company, title):
+    comp = COMPANY_NOISE.sub(" ", re.sub(r"\(.*?\)", "", strip_accents(company or "").lower()))
+    return f"{slug(comp)}|{_title_norm(title)}"
 
 
-def _parecidos(t1, t2):
+def _similar(t1, t2):
     a, b = set(t1.split("-")) - {""}, set(t2.split("-")) - {""}
     return bool(a and b) and len(a & b) / len(a | b) >= 0.75
+
+
+# Query parameters that identify the job (the rest — utm, ref, source — is noise).
+ID_PARAMS = {"positionid", "gh_jid", "jobid", "job_id", "jk", "vjk", "id", "jid", "postingid", "requisitionid"}
 
 
 def norm_url(u):
@@ -252,33 +289,30 @@ def norm_url(u):
     u = re.sub(r"^https?://", "", u)
     u = re.sub(r"^www\.", "", u)
     base, _, query = u.split("#", 1)[0].partition("?")
-    ids = sorted(p for p in query.split("&") if p.split("=", 1)[0] in PARAMS_ID)
+    ids = sorted(p for p in query.split("&") if p.split("=", 1)[0] in ID_PARAMS)
     return base.rstrip("/") + ("?" + "&".join(ids) if ids else "")
 
 
-# Parâmetros de query que identificam a vaga (o resto — utm, ref, source — é ruído).
-PARAMS_ID = {"positionid", "gh_jid", "jobid", "job_id", "jk", "vjk", "id", "jid", "postingid", "requisitionid"}
-
-
-def erro(msg, code=1):
-    print(f"ERRO {msg}")
+def fail(msg, code=1):
+    print(f"ERROR {msg}")
     sys.exit(code)
 
 
-def hoje():
+def today():
     return datetime.date.today().isoformat()
 
 
-def agora():
+def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-# ---------- conexão ----------
-def conectar(criar=False, somente_leitura=False):
-    if not os.path.exists(DB) and not criar:
-        print(f"ERRO:db-ausente {DB} — não crie um banco vazio; rode `jobdb.py init` ou restaure de {BACKUPS}")
+# ---------- connection ----------
+def connect(create=False, read_only=False):
+    if not os.path.exists(DB) and not create:
+        print(f"ERROR:db-missing {DB} — do not create an empty database by hand; run `jobdb.py init` or restore from {BACKUPS}")
         sys.exit(1)
-    if somente_leitura:
+    _migrate_if_needed()
+    if read_only:
         con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=30)
     else:
         con = sqlite3.connect(DB, timeout=30)
@@ -288,10 +322,10 @@ def conectar(criar=False, somente_leitura=False):
     return con
 
 
-def imprimir(rows, cols=None):
+def show(rows, cols=None):
     rows = list(rows)
     if not rows:
-        print("(nenhum)")
+        print("(none)")
         return
     cols = cols or rows[0].keys()
     print("\t".join(cols))
@@ -299,584 +333,819 @@ def imprimir(rows, cols=None):
         print("\t".join("" if r[c] is None else str(r[c]).replace("\n", " / ") for c in cols))
 
 
+def show_json(rows):
+    print(json.dumps([dict(r) for r in rows], ensure_ascii=False))
+
+
+def output(rows, as_json):
+    show_json(rows) if as_json else show(rows)
+
+
+# ---------- migration v1 (Portuguese) → v2 (English) ----------
+# Value maps for the enum columns. Unknown values fall back to the column's catch-all.
+_M_APP = {"aplicada": "applied", "incerta": "uncertain", "teste-pendente": "test-pending", "em-processo": "in-process",
+          "entrevista": "interview", "rejeitada": "rejected", "sem-retorno": "no-reply", "oferta": "offer", "desistiu": "withdrawn"}
+_M_REASON = {"linkedin-bloqueio": "linkedin-block", "2fa-celular": "2fa-phone", "captcha-persistente": "captcha-persistent",
+             "email-nao-chegou": "email-not-received", "sso-google-indisponivel": "google-sso-unavailable",
+             "cadastro-rejeitado": "signup-rejected", "conta-ja-existe-senha-invalida": "account-exists-bad-password",
+             "bloqueio-regional": "regional-block", "site-fora-do-ar": "site-down", "exige-documento": "document-required",
+             "paywall-assinatura": "paywall", "outro": "other"}
+_M_SITE = {"bloqueado": "blocked", "resolvido": "resolved", "descartado": "dismissed"}
+_M_Q = {"pendente": "pending", "respondida": "answered", "migrada": "migrated"}
+_M_CHANNEL = {"linkedin-dm": "linkedin-dm", "linkedin-conexao": "linkedin-connect", "linkedin-comentario": "linkedin-comment",
+              "linkedin-interesse": "linkedin-interest", "email": "email", "outro": "other"}
+_M_DIR = {"enviado": "sent", "recebido": "received"}
+_M_OPEN = {"aberta": "open", "feita": "done", "descartada": "dismissed"}
+_M_STUCK = {"cpf-rg": "national-id", "documento": "document", "senha-login": "password-login", "cadastro-novo": "new-account",
+            "2fa": "2fa", "captcha": "captcha", "pagamento": "payment", "julgamento": "judgment", "outro": "other"}
+_M_POST = {"rascunho": "draft", "aprovado": "approved", "publicado": "published", "descartado": "dismissed"}
+
+# old table → (new table, {old col: new col}, {new col: (value map, fallback)})
+_V1 = {
+    "candidaturas": ("applications", {"data": "date", "empresa": "company", "titulo": "title", "fonte": "source", "url": "url",
+                                      "url_norm": "url_norm", "chave": "key", "status": "status", "fit": "fit", "obs": "notes",
+                                      "criado_em": "created_at", "atualizado_em": "updated_at"},
+                     {"status": (_M_APP, "applied")}),
+    "descartes": ("discards", {"data": "date", "empresa": "company", "titulo": "title", "fonte": "source", "url": "url",
+                               "url_norm": "url_norm", "chave": "key", "motivo": "reason", "criado_em": "created_at"}, {}),
+    "vistas_legado": ("legacy_seen", {"url_norm": "url_norm", "contexto": "context"}, {}),
+    "perguntas": ("questions", {"data": "date", "pergunta": "question", "pergunta_norm": "question_norm", "tipo_campo": "field_type",
+                                "empresa_vaga": "company", "plataforma": "platform", "url": "url", "resposta_agente": "agent_answer",
+                                "resposta_oficial": "official_answer", "status": "status", "criado_em": "created_at"},
+                  {"status": (_M_Q, "pending")}),
+    "sites_bloqueados": ("blocked_sites", {"data": "date", "site": "site", "url": "url", "tentando": "attempting", "motivo": "reason",
+                                           "detalhe": "detail", "tentativas": "attempts", "status": "status", "resolucao": "resolution",
+                                           "criado_em": "created_at", "atualizado_em": "updated_at"},
+                         {"reason": (_M_REASON, "other"), "status": (_M_SITE, "blocked")}),
+    "contatos": ("contacts", {"data": "date", "pessoa": "person", "pessoa_norm": "person_norm", "empresa": "company", "canal": "channel",
+                              "direcao": "direction", "resumo": "summary", "candidatura_id": "application_id", "criado_em": "created_at"},
+                 {"channel": (_M_CHANNEL, "other"), "direction": (_M_DIR, "sent")}),
+    "pendencias": ("todos", {"data": "date", "descricao": "description", "prazo": "due", "url": "url", "candidatura_id": "application_id",
+                             "status": "status", "criado_em": "created_at", "resolvido_em": "resolved_at"},
+                   {"status": (_M_OPEN, "open")}),
+    "travadas": ("stuck_jobs", {"data": "date", "tipo": "kind", "empresa": "company", "titulo": "title", "chave": "key", "url": "url",
+                                "url_norm": "url_norm", "url_form": "form_url", "site": "site", "rotina": "routine", "fit": "fit",
+                                "etapa": "step", "campos": "fields", "detalhe": "detail", "obs": "notes", "candidatura_id": "application_id",
+                                "status": "status", "resolucao": "resolution", "criado_em": "created_at", "resolvido_em": "resolved_at"},
+                 {"kind": (_M_STUCK, "other"), "status": (_M_OPEN, "open")}),
+    "controle": ("control", {"chave": "key", "valor": "value", "atualizado_em": "updated_at"}, {}),
+    "sessao_log": ("run_log", {"data_rodada": "run_date", "ts": "ts", "tipo": "kind", "texto": "text"}, {}),
+    "posts": ("posts", {"ordem": "position", "tema": "topic", "gancho": "hook", "texto": "text", "imagem": "image", "status": "status",
+                        "publicado_em": "published_at", "url": "url", "obs": "notes", "criado_em": "created_at", "atualizado_em": "updated_at"},
+              {"status": (_M_POST, "draft")}),
+}
+
+
+def _is_v1():
+    """Cheap READ-ONLY check: does this DB still have the v1 `candidaturas` table? No write side effect,
+    so a normal read of an already-v2 DB never opens a write connection or touches backups/."""
+    try:
+        ro = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=30)
+        try:
+            return ro.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='candidaturas'").fetchone() is not None
+        finally:
+            ro.close()
+    except sqlite3.Error:
+        return False
+
+
+def _migrate_if_needed():
+    """Upgrade a v1 (Portuguese) state.db in place to the v2 English schema. Idempotent; takes a
+    backup first and runs in one transaction, so a failure leaves the original untouched.
+    Only opens a write connection when a v1 DB is actually present (checked read-only first), so a
+    normal read against a v2 DB has no write side effect."""
+    if not os.path.exists(DB) or not _is_v1():
+        return
+    con = sqlite3.connect(DB, timeout=30, isolation_level=None)  # manual BEGIN/COMMIT (DDL included)
+    try:
+        # Back up the pristine v1 DB BEFORE taking the write lock (con.backup deadlocks if the source
+        # connection already holds an open write transaction). In the rare concurrent-first-run case
+        # this may write a backup we then discard — harmless.
+        os.makedirs(BACKUPS, exist_ok=True)
+        with sqlite3.connect(os.path.join(BACKUPS, f"state-v1-{datetime.datetime.now():%Y-%m-%d_%H%M%S}.db")) as dst:
+            con.backup(dst)
+        con.execute("PRAGMA foreign_keys=OFF")
+        con.execute("BEGIN IMMEDIATE")
+        # re-check INSIDE the transaction: another process may have migrated while we waited for the
+        # write lock (concurrent first run). If `candidaturas` is gone, there is nothing to do.
+        names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "candidaturas" not in names:
+            con.execute("COMMIT")
+            return
+        # the v1 `posts` table shares its name with v2 — move it aside first
+        if "posts" in names:
+            con.execute("ALTER TABLE posts RENAME TO posts_v1")
+        for stmt in SCHEMA.split(";"):
+            if stmt.strip():
+                con.execute(stmt)
+        for old, (new, cols, maps) in _V1.items():
+            src = "posts_v1" if old == "posts" else old
+            if src not in {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}:
+                continue
+            have = {r[1] for r in con.execute(f"PRAGMA table_info({src})")}
+            pairs = [(o, n) for o, n in cols.items() if o in have]
+            id_col = "id" in have and old not in ("vistas_legado", "controle")
+            sel = (["id"] if id_col else []) + [o for o, _ in pairs]
+            ins = (["id"] if id_col else []) + [n for _, n in pairs]
+            for r in con.execute(f"SELECT {','.join(sel)} FROM {src}").fetchall():
+                vals = dict(zip(ins, r))
+                for col, (m, fb) in maps.items():
+                    if col in vals:
+                        vals[col] = m.get(vals[col], fb)
+                if new == "control" and vals.get("key") == "NAVEGADOR_LOCK":
+                    vals["key"] = LOCK
+                con.execute(f"INSERT OR REPLACE INTO {new} ({','.join(vals)}) VALUES ({','.join('?' * len(vals))})",
+                            list(vals.values()))
+            con.execute(f"DROP TABLE {src}")
+        if "historico" in names:
+            con.execute("DROP TABLE historico")
+        # the v1 schema had no people table — backfill it from the migrated contacts so the CRM
+        # view shows everyone the agent ever talked to (interest pings excluded; they have no person)
+        con.execute(
+            "INSERT OR IGNORE INTO people (person_norm,name,company) "
+            "SELECT person_norm, person, (SELECT company FROM contacts c2 WHERE c2.person_norm=c.person_norm "
+            "  AND company IS NOT NULL ORDER BY date DESC LIMIT 1) "
+            "FROM contacts c WHERE channel<>'linkedin-interest' GROUP BY person_norm")
+        con.execute("INSERT INTO control (key,value) VALUES ('schema_version',?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (SCHEMA_VERSION,))
+        con.execute("COMMIT")
+        print(f"migrated state.db from schema v1 to v{SCHEMA_VERSION} (backup in {BACKUPS})", file=sys.stderr)
+    except Exception:
+        if con.in_transaction:
+            con.execute("ROLLBACK")
+        raise
+    finally:
+        con.close()
+
+
 # ---------- dedup ----------
-def urls_vistas(con):
-    q = """SELECT url_norm FROM candidaturas WHERE url_norm <> ''
-           UNION SELECT url_norm FROM descartes WHERE url_norm <> ''
-           UNION SELECT url_norm FROM travadas WHERE url_norm <> ''
-           UNION SELECT url_norm FROM vistas_legado"""
+def seen_urls(con):
+    q = """SELECT url_norm FROM applications WHERE url_norm <> ''
+           UNION SELECT url_norm FROM discards WHERE url_norm <> ''
+           UNION SELECT url_norm FROM stuck_jobs WHERE url_norm <> ''
+           UNION SELECT url_norm FROM legacy_seen"""
     return {r[0] for r in con.execute(q)}
 
 
-def dedup(con, url, empresa, titulo):
+def dedup(con, url, company, title):
     un = norm_url(url)
     if un:
-        r = con.execute("SELECT id,status,data FROM candidaturas WHERE url_norm=? LIMIT 1", (un,)).fetchone()
+        r = con.execute("SELECT id,status,date FROM applications WHERE url_norm=? LIMIT 1", (un,)).fetchone()
         if r:
-            return f"DUPLICADA candidatura id={r['id']} status={r['status']} data={r['data']} (mesma URL)"
-        r = con.execute("SELECT id,data,motivo FROM descartes WHERE url_norm=? LIMIT 1", (un,)).fetchone()
+            return f"DUPLICATE application id={r['id']} status={r['status']} date={r['date']} (same URL)"
+        r = con.execute("SELECT id,date,reason FROM discards WHERE url_norm=? LIMIT 1", (un,)).fetchone()
         if r:
-            return f"DESCARTADA-ANTES id={r['id']} data={r['data']} motivo={(r['motivo'] or '')[:120]}"
-        r = con.execute("SELECT id,data,tipo,status FROM travadas WHERE url_norm=? LIMIT 1", (un,)).fetchone()
+            return f"DISCARDED-BEFORE id={r['id']} date={r['date']} reason={(r['reason'] or '')[:120]}"
+        r = con.execute("SELECT id,date,kind,status FROM stuck_jobs WHERE url_norm=? LIMIT 1", (un,)).fetchone()
         if r:
-            return f"TRAVADA id={r['id']} tipo={r['tipo']} status={r['status']} data={r['data']} (já está na sua lista — pular)"
-        r = con.execute("SELECT contexto FROM vistas_legado WHERE url_norm=?", (un,)).fetchone()
+            return f"STUCK id={r['id']} kind={r['kind']} status={r['status']} date={r['date']} (already on your list — skip)"
+        r = con.execute("SELECT context FROM legacy_seen WHERE url_norm=?", (un,)).fetchone()
         if r:
-            return f"VISTA-LEGADO (URL citada em import antigo: {(r['contexto'] or '')[:120]})"
-    if empresa:
-        k = chave(empresa, titulo)
-        r = con.execute("SELECT id,status,data FROM candidaturas WHERE chave=? LIMIT 1", (k,)).fetchone()
+            return f"LEGACY-SEEN (URL cited in an old import: {(r['context'] or '')[:120]})"
+    if company:
+        k = job_key(company, title)
+        r = con.execute("SELECT id,status,date FROM applications WHERE key=? LIMIT 1", (k,)).fetchone()
         if r:
-            return f"DUPLICADA candidatura id={r['id']} status={r['status']} data={r['data']} (mesma empresa+cargo)"
-        r = con.execute("SELECT id,data,motivo FROM descartes WHERE chave=? LIMIT 1", (k,)).fetchone()
+            return f"DUPLICATE application id={r['id']} status={r['status']} date={r['date']} (same company+role)"
+        r = con.execute("SELECT id,date,reason FROM discards WHERE key=? LIMIT 1", (k,)).fetchone()
         if r:
-            return f"DESCARTADA-ANTES id={r['id']} data={r['data']} motivo={(r['motivo'] or '')[:120]}"
-        r = con.execute("SELECT id,data,tipo,status FROM travadas WHERE chave=? LIMIT 1", (k,)).fetchone()
+            return f"DISCARDED-BEFORE id={r['id']} date={r['date']} reason={(r['reason'] or '')[:120]}"
+        r = con.execute("SELECT id,date,kind,status FROM stuck_jobs WHERE key=? LIMIT 1", (k,)).fetchone()
         if r:
-            return f"TRAVADA id={r['id']} tipo={r['tipo']} status={r['status']} data={r['data']} (mesma empresa+cargo; já está na sua lista — pular)"
-        emp, _, tit = k.partition("|")
-        for r in con.execute("SELECT id,status,data,titulo,chave FROM candidaturas WHERE chave LIKE ?", (emp + "|%",)):
-            if _parecidos(tit, r["chave"].partition("|")[2]):
-                return f"DUPLICADA candidatura id={r['id']} status={r['status']} data={r['data']} (mesma empresa, título equivalente: \"{r['titulo']}\")"
-    return "NOVA"
+            return f"STUCK id={r['id']} kind={r['kind']} status={r['status']} date={r['date']} (same company+role; already on your list — skip)"
+        comp, _, tit = k.partition("|")
+        for r in con.execute("SELECT id,status,date,title,key FROM applications WHERE key LIKE ?", (comp + "|%",)):
+            if _similar(tit, r["key"].partition("|")[2]):
+                return f"DUPLICATE application id={r['id']} status={r['status']} date={r['date']} (same company, equivalent title: \"{r['title']}\")"
+    return "NEW"
 
 
-# ---------- comandos ----------
-def _criar_banco():
-    """Cria o schema do banco (idempotente) e carimba a versão. O plugin traz o próprio banco."""
-    con = conectar(criar=True)
+# ---------- ghost jobs: how often a posting has been seen ----------
+def record_seen(con, company, title, url=""):
+    """Scanner hook: count one sighting of company+title (at most once per day)."""
+    k, d = job_key(company, title), today()
+    r = con.execute("SELECT last_seen FROM seen_postings WHERE key=?", (k,)).fetchone()
+    if not r:
+        con.execute("INSERT INTO seen_postings (key,company,title,url,first_seen,last_seen) VALUES (?,?,?,?,?,?)",
+                    (k, company, title, url, d, d))
+    elif r[0] != d:
+        con.execute("UPDATE seen_postings SET last_seen=?, times=times+1, url=COALESCE(?,url) WHERE key=?", (d, url or None, k))
+
+
+def seen_stats(con, company, title):
+    """(times seen, days between first and last sighting) for company+title."""
+    r = con.execute("SELECT first_seen,last_seen,times FROM seen_postings WHERE key=?", (job_key(company, title),)).fetchone()
+    if not r:
+        return 1, 0
+    span = (datetime.date.fromisoformat(r["last_seen"]) - datetime.date.fromisoformat(r["first_seen"])).days
+    return r["times"], span
+
+
+# ---------- commands ----------
+def _create_db():
+    """Create the schema (idempotent) and stamp the version. The plugin ships its own database."""
+    con = connect(create=True)
     con.executescript(SCHEMA)
-    con.execute("INSERT INTO controle (chave,valor) VALUES ('schema_version',?) "
-                "ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor", (SCHEMA_VERSION,))
+    con.execute("INSERT INTO control (key,value) VALUES ('schema_version',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (SCHEMA_VERSION,))
     con.commit()
     return con
 
 
 def cmd_init(a):
-    _criar_banco()
-    print(f"OK schema em {DB} (schema_version={SCHEMA_VERSION})")
+    _create_db()
+    print(f"OK schema at {DB} (schema_version={SCHEMA_VERSION})")
 
 
 def cmd_check(a):
-    # 1ª execução: o plugin cria o próprio banco automaticamente, isolado no config dir
-    # (APLICA_HOME / ~/.config/aplica), nunca apontando para um banco já existente na máquina.
+    # First run: the plugin creates its own database automatically, isolated in the config dir
+    # (APLICA_HOME / ~/.config/aplica), never pointing at a database that already exists on the machine.
     if not os.path.exists(DB):
         try:
-            _criar_banco()
-            print(f"banco criado automaticamente em {DB}")
+            _create_db()
+            print(f"database created automatically at {DB}")
         except sqlite3.Error as e:
-            print(f"ERRO:db-criacao {e}")
+            print(f"ERROR:db-create {e}")
             sys.exit(1)
     try:
-        con = conectar()
+        con = connect()
+        con.executescript(SCHEMA)  # additive: tables added in a later version appear on check
         ok = con.execute("PRAGMA integrity_check").fetchone()[0]
         if ok != "ok":
-            print(f"ERRO:integridade {ok}")
+            print(f"ERROR:integrity {ok}")
             sys.exit(1)
-        existentes = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        faltando = [t for t in TABELAS if t not in existentes]
-        if faltando:
-            print(f"ERRO:tabelas-faltando {','.join(faltando)}")
+        existing = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        missing = [t for t in TABLES if t not in existing]
+        if missing:
+            print(f"ERROR:missing-tables {','.join(missing)}")
             sys.exit(1)
-        for t in TABELAS:
+        for t in TABLES:
             print(f"{t}: {con.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]}")
-        r = con.execute("SELECT valor FROM controle WHERE chave='schema_version'").fetchone()
+        r = con.execute("SELECT value FROM control WHERE key='schema_version'").fetchone()
         ver = r[0] if r else None
         if ver and ver != SCHEMA_VERSION:
-            print(f"AVISO:schema-version banco={ver} motor={SCHEMA_VERSION} (drift entre cópias do engine — ressincronize)")
+            print(f"WARNING:schema-version db={ver} engine={SCHEMA_VERSION} (drift between engine copies — resync)")
     except sqlite3.Error as e:
-        print(f"ERRO:sqlite {e}")
+        print(f"ERROR:sqlite {e}")
         sys.exit(1)
     print("OK")
 
 
 def cmd_backup(a):
-    con = conectar()
+    con = connect()
     os.makedirs(BACKUPS, exist_ok=True)
-    destino = os.path.join(BACKUPS, f"state-{datetime.datetime.now():%Y-%m-%d_%H%M}.db")
-    with sqlite3.connect(destino) as dst:
+    dest = os.path.join(BACKUPS, f"state-{datetime.datetime.now():%Y-%m-%d_%H%M}.db")
+    with sqlite3.connect(dest) as dst:
         con.backup(dst)
-    antigos = sorted(f for f in os.listdir(BACKUPS) if f.startswith("state-") and f.endswith(".db"))
-    for f in antigos[:-KEEP_BACKUPS]:
+    old = sorted(f for f in os.listdir(BACKUPS) if f.startswith("state-") and f.endswith(".db") and not f.startswith("state-v1-"))
+    for f in old[:-KEEP_BACKUPS]:
         os.remove(os.path.join(BACKUPS, f))
-    print(f"OK {destino}")
+    print(f"OK {dest}")
 
 
 def cmd_dedup(a):
-    print(dedup(conectar(somente_leitura=True), a.url, a.empresa, a.titulo))
+    print(dedup(connect(read_only=True), a.url, a.company, a.title))
 
 
-def cmd_add_candidatura(a):
-    if a.status not in STATUS_CAND:
-        erro(f"status inválido: {a.status} (válidos: {', '.join(STATUS_CAND)})")
-    con = conectar()
-    d = dedup(con, a.url, a.empresa, a.titulo)
-    if d != "NOVA":
+def cmd_add_application(a):
+    if a.status not in APP_STATUS:
+        fail(f"invalid status: {a.status} (valid: {', '.join(APP_STATUS)})")
+    con = connect()
+    d = dedup(con, a.url, a.company, a.title)
+    if d != "NEW":
         print(d)
-        if d.startswith("DESCARTADA-ANTES"):
-            print("NAO-GRAVADO — vaga já descartada no gate; --force não vale aqui (só você reverte um descarte)")
+        if d.startswith("DISCARDED-BEFORE"):
+            print("NOT-SAVED — job already discarded at the gate; --force does not apply (only you can reverse a discard)")
             sys.exit(2)
         if not a.force:
-            print("NAO-GRAVADO (use --force --motivo-force \"..\" só se for vaga genuinamente diferente)")
+            print("NOT-SAVED (use --force --force-reason \"..\" only for a genuinely different job)")
             sys.exit(2)
-        if not a.motivo_force:
-            erro("--force exige --motivo-force explicando por que é outra vaga", 2)
-    _barra_segredo(a.obs)
+        if not a.force_reason:
+            fail("--force requires --force-reason explaining why it is a different job", 2)
+    _block_secret(a.notes)
     cur = con.execute(
-        "INSERT INTO candidaturas (data,empresa,titulo,fonte,url,url_norm,chave,status,fit,obs) VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (a.data or hoje(), a.empresa, a.titulo or "", a.fonte, a.url, norm_url(a.url),
-         chave(a.empresa, a.titulo), a.status, a.fit, a.obs))
-    if a.force and d != "NOVA":
-        con.execute("INSERT INTO pendencias (data,descricao,url,candidatura_id) VALUES (?,?,?,?)",
-                    (hoje(), f"Revisar candidatura FORÇADA id={cur.lastrowid} ({a.empresa} — {a.titulo}): {a.motivo_force} | dedup dizia: {d[:150]}",
+        "INSERT INTO applications (date,company,title,source,url,url_norm,key,status,fit,resume,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (a.date or today(), a.company, a.title or "", a.source, a.url, norm_url(a.url),
+         job_key(a.company, a.title), a.status, a.fit, a.resume, a.notes))
+    if a.force and d != "NEW":
+        con.execute("INSERT INTO todos (date,description,url,application_id) VALUES (?,?,?,?)",
+                    (today(), f"Review FORCED application id={cur.lastrowid} ({a.company} — {a.title}): {a.force_reason} | dedup said: {d[:150]}",
                      a.url, cur.lastrowid))
     con.commit()
-    print(f"OK candidatura id={cur.lastrowid}")
+    print(f"OK application id={cur.lastrowid}")
 
 
-def cmd_update_candidatura(a):
-    con = conectar()
+def cmd_update_application(a):
+    con = connect()
     if a.id:
-        r = con.execute("SELECT * FROM candidaturas WHERE id=?", (a.id,)).fetchone()
+        r = con.execute("SELECT * FROM applications WHERE id=?", (a.id,)).fetchone()
     elif a.url:
-        r = con.execute("SELECT * FROM candidaturas WHERE url_norm=? ORDER BY id DESC LIMIT 1", (norm_url(a.url),)).fetchone()
+        r = con.execute("SELECT * FROM applications WHERE url_norm=? ORDER BY id DESC LIMIT 1", (norm_url(a.url),)).fetchone()
     else:
-        erro("informe --id ou --url")
+        fail("pass --id or --url")
     if not r:
-        erro("candidatura não encontrada")
+        fail("application not found")
     status = a.status or r["status"]
-    if status not in STATUS_CAND:
-        erro(f"status inválido: {status}")
-    _barra_segredo(a.obs_append)
-    obs = r["obs"] or ""
-    if a.obs_append:
-        obs = (obs + "\n" if obs else "") + f"[{hoje()}] {a.obs_append}"
+    if status not in APP_STATUS:
+        fail(f"invalid status: {status}")
+    _block_secret(a.notes_append)
+    notes = r["notes"] or ""
+    if a.notes_append:
+        notes = (notes + "\n" if notes else "") + f"[{today()}] {a.notes_append}"
+    elif a.status and a.status != r["status"]:
+        notes = (notes + "\n" if notes else "") + f"[{today()}] status {r['status']} → {a.status}"
     fit = a.fit if a.fit is not None else r["fit"]
-    con.execute("UPDATE candidaturas SET status=?, obs=?, fit=?, atualizado_em=datetime('now','localtime') WHERE id=?",
-                (status, obs, fit, r["id"]))
+    con.execute("UPDATE applications SET status=?, notes=?, fit=?, updated_at=datetime('now','localtime') WHERE id=?",
+                (status, notes, fit, r["id"]))
     con.commit()
-    print(f"OK candidatura id={r['id']} status={status}")
+    print(f"OK application id={r['id']} status={status}")
 
 
-def cmd_add_descarte(a):
-    _barra_segredo(a.motivo)
-    con = conectar()
+def cmd_add_discard(a):
+    _block_secret(a.reason)
+    con = connect()
     cur = con.execute(
-        "INSERT INTO descartes (data,empresa,titulo,fonte,url,url_norm,chave,motivo) VALUES (?,?,?,?,?,?,?,?)",
-        (a.data or hoje(), a.empresa, a.titulo or "", a.fonte, a.url, norm_url(a.url), chave(a.empresa, a.titulo), a.motivo))
+        "INSERT INTO discards (date,company,title,source,url,url_norm,key,reason) VALUES (?,?,?,?,?,?,?,?)",
+        (a.date or today(), a.company, a.title or "", a.source, a.url, norm_url(a.url), job_key(a.company, a.title), a.reason))
     con.commit()
-    print(f"OK descarte id={cur.lastrowid}")
+    print(f"OK discard id={cur.lastrowid}")
 
 
-def cmd_candidaturas(a):
-    con = conectar(somente_leitura=True)
+def cmd_applications(a):
+    con = connect(read_only=True)
     where, args = [], []
-    if a.data:
-        where.append("data=?"); args.append(a.data)
+    if a.date:
+        where.append("date=?"); args.append(a.date)
     if a.status:
         where.append("status=?"); args.append(a.status)
-    if a.busca:
-        where.append("(empresa LIKE ? OR titulo LIKE ? OR obs LIKE ?)"); args += [f"%{a.busca}%"] * 3
-    sql = "SELECT id,data,empresa,titulo,fonte,status,fit,url FROM candidaturas"
+    if a.search:
+        where.append("(company LIKE ? OR title LIKE ? OR notes LIKE ?)"); args += [f"%{a.search}%"] * 3
+    cols = "id,date,company,title,source,status,fit,resume,url" + (",notes,updated_at" if a.json else "")
+    sql = f"SELECT {cols} FROM applications"
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += f" ORDER BY data DESC, id DESC LIMIT {int(a.limite)}"
-    imprimir(con.execute(sql, args))
+    sql += f" ORDER BY date DESC, id DESC LIMIT {int(a.limit)}"
+    output(con.execute(sql, args), a.json)
 
 
-def cmd_hoje(a):
-    con = conectar(somente_leitura=True)
-    d = a.data or hoje()
-    n = con.execute("SELECT COUNT(*) FROM candidaturas WHERE data=? AND status<>'incerta'", (d,)).fetchone()[0]
-    print(f"CANDIDATURAS_CONTAM={n}")
-    imprimir(con.execute("SELECT id,empresa,titulo,status,url FROM candidaturas WHERE data=? ORDER BY id", (d,)))
+def cmd_today(a):
+    con = connect(read_only=True)
+    d = a.date or today()
+    n = con.execute("SELECT COUNT(*) FROM applications WHERE date=? AND status<>'uncertain'", (d,)).fetchone()[0]
+    print(f"APPLICATIONS_COUNTED={n}")
+    show(con.execute("SELECT id,company,title,status,url FROM applications WHERE date=? ORDER BY id", (d,)))
 
 
-def cmd_add_pergunta(a):
-    _barra_segredo(a.pergunta, a.resposta_agente)
-    con = conectar()
-    pn = slug(a.pergunta)
-    r = con.execute("SELECT id,empresa_vaga FROM perguntas WHERE pergunta_norm=?", (pn,)).fetchone()
+def cmd_add_question(a):
+    _block_secret(a.question, a.agent_answer)
+    con = connect()
+    qn = slug(a.question)
+    r = con.execute("SELECT id,company FROM questions WHERE question_norm=?", (qn,)).fetchone()
     if r:
-        if a.empresa_vaga and a.empresa_vaga not in (r["empresa_vaga"] or ""):
-            con.execute("UPDATE perguntas SET empresa_vaga=? WHERE id=?",
-                        (((r["empresa_vaga"] or "") + "; " + a.empresa_vaga).strip("; "), r["id"]))
+        if a.company and a.company not in (r["company"] or ""):
+            con.execute("UPDATE questions SET company=? WHERE id=?",
+                        (((r["company"] or "") + "; " + a.company).strip("; "), r["id"]))
             con.commit()
-        print(f"EXISTENTE pergunta id={r['id']} (ocorrência somada)")
+        print(f"EXISTING question id={r['id']} (occurrence added)")
         return
     cur = con.execute(
-        "INSERT INTO perguntas (data,pergunta,pergunta_norm,tipo_campo,empresa_vaga,plataforma,url,resposta_agente) VALUES (?,?,?,?,?,?,?,?)",
-        (a.data or hoje(), a.pergunta, pn, a.tipo_campo, a.empresa_vaga, a.plataforma, a.url, a.resposta_agente))
+        "INSERT INTO questions (date,question,question_norm,field_type,company,platform,url,agent_answer) VALUES (?,?,?,?,?,?,?,?)",
+        (a.date or today(), a.question, qn, a.field_type, a.company, a.platform, a.url, a.agent_answer))
     con.commit()
-    print(f"OK pergunta id={cur.lastrowid}")
+    print(f"OK question id={cur.lastrowid}")
 
 
-def cmd_perguntas(a):
-    con = conectar(somente_leitura=True)
-    sql = "SELECT id,data,status,pergunta,resposta_agente,resposta_oficial FROM perguntas"
-    if a.com_resposta:
-        sql += " WHERE resposta_oficial IS NOT NULL AND resposta_oficial<>''"
-    elif a.status:
-        sql += f" WHERE status='{a.status}'" if a.status in STATUS_PERG else ""
-    imprimir(con.execute(sql + " ORDER BY id"))
+def cmd_questions(a):
+    con = connect(read_only=True)
+    sql, args = "SELECT id,date,status,question,agent_answer,official_answer FROM questions", []
+    if a.answered:
+        sql += " WHERE official_answer IS NOT NULL AND official_answer<>''"
+    elif a.status in QUESTION_STATUS:
+        sql, args = sql + " WHERE status=?", [a.status]
+    output(con.execute(sql + " ORDER BY id", args), a.json)
 
 
-def cmd_responder_pergunta(a):
-    con = conectar()
-    n = con.execute("UPDATE perguntas SET resposta_oficial=?, status='respondida' WHERE id=?", (a.resposta, a.id)).rowcount
+def cmd_answer_question(a):
+    _block_secret(a.answer)  # official_answer is surfaced in `context` JSON (drafts grounding) — never store a secret
+    con = connect()
+    n = con.execute("UPDATE questions SET official_answer=?, status='answered' WHERE id=?", (a.answer, a.id)).rowcount
     con.commit()
     if not n:
-        erro(f"pergunta id={a.id} não existe")
-    print(f"OK pergunta id={a.id} respondida")
+        fail(f"question id={a.id} does not exist")
+    print(f"OK question id={a.id} answered")
 
 
 def cmd_add_site(a):
-    if a.motivo not in MOTIVOS_SITE:
-        erro(f"motivo inválido: {a.motivo} (válidos: {', '.join(MOTIVOS_SITE)})")
-    _barra_segredo(a.detalhe)
-    con = conectar()
-    r = con.execute("SELECT id,tentativas FROM sites_bloqueados WHERE lower(site)=lower(?) AND status='bloqueado' ORDER BY id DESC LIMIT 1",
+    if a.reason not in SITE_REASONS:
+        fail(f"invalid reason: {a.reason} (valid: {', '.join(SITE_REASONS)})")
+    _block_secret(a.detail, a.attempting)
+    con = connect()
+    r = con.execute("SELECT id,attempts FROM blocked_sites WHERE lower(site)=lower(?) AND status='blocked' ORDER BY id DESC LIMIT 1",
                     (a.site,)).fetchone()
     if r:
-        con.execute("UPDATE sites_bloqueados SET tentativas=tentativas+1, data=?, motivo=?, detalhe=?, atualizado_em=datetime('now','localtime') WHERE id=?",
-                    (a.data or hoje(), a.motivo, a.detalhe, r["id"]))
+        con.execute("UPDATE blocked_sites SET attempts=attempts+1, date=?, reason=?, detail=?, updated_at=datetime('now','localtime') WHERE id=?",
+                    (a.date or today(), a.reason, a.detail, r["id"]))
         con.commit()
-        print(f"OK site id={r['id']} tentativas={r['tentativas'] + 1}")
+        print(f"OK site id={r['id']} attempts={r['attempts'] + 1}")
         return
-    cur = con.execute("INSERT INTO sites_bloqueados (data,site,url,tentando,motivo,detalhe) VALUES (?,?,?,?,?,?)",
-                      (a.data or hoje(), a.site, a.url, a.tentando, a.motivo, a.detalhe))
+    cur = con.execute("INSERT INTO blocked_sites (date,site,url,attempting,reason,detail) VALUES (?,?,?,?,?,?)",
+                      (a.date or today(), a.site, a.url, a.attempting, a.reason, a.detail))
     con.commit()
     print(f"OK site id={cur.lastrowid}")
 
 
 def cmd_update_site(a):
-    if a.status and a.status not in STATUS_SITE:
-        erro(f"status inválido: {a.status}")
-    _barra_segredo(a.resolucao)
-    con = conectar()
-    n = con.execute("UPDATE sites_bloqueados SET status=COALESCE(?,status), resolucao=COALESCE(?,resolucao), atualizado_em=datetime('now','localtime') WHERE id=?",
-                    (a.status, a.resolucao, a.id)).rowcount
+    if a.status and a.status not in SITE_STATUS:
+        fail(f"invalid status: {a.status}")
+    _block_secret(a.resolution)
+    con = connect()
+    n = con.execute("UPDATE blocked_sites SET status=COALESCE(?,status), resolution=COALESCE(?,resolution), updated_at=datetime('now','localtime') WHERE id=?",
+                    (a.status, a.resolution, a.id)).rowcount
     con.commit()
     if not n:
-        erro(f"site id={a.id} não existe")
+        fail(f"site id={a.id} does not exist")
     print(f"OK site id={a.id}")
 
 
-def cooldown(motivo, tentativas, data):
-    if motivo not in ("linkedin-bloqueio", "captcha-persistente"):
+def cooldown(reason, attempts, date):
+    if reason not in ("linkedin-block", "captcha-persistent"):
         return ""
-    if tentativas >= 3:
-        return "desativada — precisa de você"
-    horas = 24 if tentativas <= 1 else 72
+    if attempts >= 3:
+        return "disabled — needs you"
+    hours = 24 if attempts <= 1 else 72
     try:
-        fim = datetime.datetime.fromisoformat(data) + datetime.timedelta(hours=horas)
-        return f"cooldown até {fim:%Y-%m-%d}" if fim > datetime.datetime.now() else "cooldown vencido"
+        end = datetime.datetime.fromisoformat(date) + datetime.timedelta(hours=hours)
+        return f"cooldown until {end:%Y-%m-%d}" if end > datetime.datetime.now() else "cooldown over"
     except ValueError:
         return ""
 
 
-def cmd_sites_ativos(a):
-    con = conectar(somente_leitura=True)
-    rows = con.execute("SELECT id,data,site,motivo,tentativas,status FROM sites_bloqueados WHERE status IN ('bloqueado','descartado') ORDER BY site").fetchall()
+def cmd_active_sites(a):
+    con = connect(read_only=True)
+    rows = con.execute("SELECT id,date,site,reason,attempts,status FROM blocked_sites WHERE status IN ('blocked','dismissed') ORDER BY site").fetchall()
     if not rows:
-        print("(nenhum)")
+        print("(none)")
     for r in rows:
-        print(f"{r['id']}\t{r['site']}\t{r['status']}\t{r['motivo']}\ttentativas={r['tentativas']}\t{r['data']}\t{cooldown(r['motivo'], r['tentativas'], r['data'])}")
+        print(f"{r['id']}\t{r['site']}\t{r['status']}\t{r['reason']}\tattempts={r['attempts']}\t{r['date']}\t{cooldown(r['reason'], r['attempts'], r['date'])}")
 
 
-def cmd_add_contato(a):
-    if a.canal not in CANAIS:
-        erro(f"canal inválido: {a.canal} (válidos: {', '.join(CANAIS)})")
-    _barra_segredo(a.resumo)
-    con = conectar()
-    cur = con.execute("INSERT INTO contatos (data,pessoa,pessoa_norm,empresa,canal,direcao,resumo,candidatura_id) VALUES (?,?,?,?,?,?,?,?)",
-                      (a.data or hoje(), a.pessoa, slug(a.pessoa), a.empresa, a.canal, a.direcao, a.resumo, a.candidatura_id))
+def _upsert_person(con, name, company=None, role=None, profile_url=None, email=None, notes=None):
+    pn = slug(name)
+    con.execute(
+        "INSERT INTO people (person_norm,name,company,role,profile_url,email,notes) VALUES (?,?,?,?,?,?,?) "
+        "ON CONFLICT(person_norm) DO UPDATE SET company=COALESCE(excluded.company,company), role=COALESCE(excluded.role,role), "
+        "profile_url=COALESCE(excluded.profile_url,profile_url), email=COALESCE(excluded.email,email), "
+        "notes=COALESCE(excluded.notes,notes), updated_at=datetime('now','localtime')",
+        (pn, name, company, role, profile_url, email, notes))
+    return pn
+
+
+def cmd_add_contact(a):
+    if a.channel not in CHANNELS:
+        fail(f"invalid channel: {a.channel} (valid: {', '.join(CHANNELS)})")
+    _block_secret(a.summary)
+    con = connect()
+    # "I'm interested" is logged against a company page, not a person — keep it out of the CRM
+    if a.channel != "linkedin-interest":
+        _upsert_person(con, a.person, company=a.company)
+    cur = con.execute("INSERT INTO contacts (date,person,person_norm,company,channel,direction,summary,application_id) VALUES (?,?,?,?,?,?,?,?)",
+                      (a.date or today(), a.person, slug(a.person), a.company, a.channel, a.direction, a.summary, a.application_id))
     con.commit()
-    print(f"OK contato id={cur.lastrowid}")
+    print(f"OK contact id={cur.lastrowid}")
 
 
-def cmd_contato_recente(a):
-    con = conectar(somente_leitura=True)
-    desde = (datetime.date.today() - datetime.timedelta(days=a.dias)).isoformat()
-    filtro, args = "", [slug(a.pessoa), desde]
-    if a.canal:
-        filtro, args = " AND canal=?", args + [a.canal]
-    r = con.execute("SELECT data,canal,resumo FROM contatos WHERE pessoa_norm=? AND direcao='enviado' AND data>=?" + filtro +
-                    " ORDER BY data DESC LIMIT 1", args).fetchone()
+def cmd_person(a):
+    """CRM: upsert a person's details (company, role, links, notes)."""
+    _block_secret(a.notes)
+    con = connect()
+    pn = _upsert_person(con, a.name, a.company, a.role, a.profile_url, a.email, a.notes)
+    con.commit()
+    print(f"OK person {pn}")
+
+
+def cmd_contacts(a):
+    """CRM: one row per person — last touch, counts, linked application."""
+    con = connect(read_only=True)
+    sql = """
+      WITH agg AS (
+        SELECT person_norm, MAX(date) AS last_date, COUNT(*) AS touches,
+               SUM(direction='sent') AS sent, SUM(direction='received') AS received,
+               MAX(application_id) AS application_id
+        FROM contacts WHERE channel<>'linkedin-interest' GROUP BY person_norm)
+      SELECT p.person_norm AS id, p.name, COALESCE(p.company,
+               (SELECT company FROM contacts c WHERE c.person_norm=p.person_norm AND company IS NOT NULL ORDER BY date DESC LIMIT 1)) AS company,
+             p.role, p.profile_url, p.email, p.notes,
+             agg.last_date, COALESCE(agg.touches,0) AS touches, COALESCE(agg.sent,0) AS sent, COALESCE(agg.received,0) AS received,
+             (SELECT channel || ' · ' || direction || COALESCE(' — ' || summary,'') FROM contacts c WHERE c.person_norm=p.person_norm
+               ORDER BY date DESC, id DESC LIMIT 1) AS last_touch,
+             agg.application_id
+      FROM people p LEFT JOIN agg ON agg.person_norm=p.person_norm"""
+    args = []
+    if a.search:
+        sql += " WHERE p.name LIKE ? OR p.company LIKE ? OR p.notes LIKE ?"
+        args = [f"%{a.search}%"] * 3
+    sql += " ORDER BY COALESCE(agg.last_date,'0000') DESC, p.name"
+    output(con.execute(sql, args), a.json)
+
+
+def cmd_contact_history(a):
+    con = connect(read_only=True)
+    output(con.execute("SELECT id,date,channel,direction,company,summary,application_id FROM contacts WHERE person_norm=? ORDER BY date DESC, id DESC",
+                       (slug(a.person),)), a.json)
+
+
+def cmd_recent_contact(a):
+    con = connect(read_only=True)
+    since = (datetime.date.today() - datetime.timedelta(days=a.days)).isoformat()
+    flt, args = "", [slug(a.person), since]
+    if a.channel:
+        flt, args = " AND channel=?", args + [a.channel]
+    r = con.execute("SELECT date,channel,summary FROM contacts WHERE person_norm=? AND direction='sent' AND date>=?" + flt +
+                    " ORDER BY date DESC LIMIT 1", args).fetchone()
     if r:
-        print(f"SIM {r['data']} {r['canal']} — {(r['resumo'] or '')[:120]}")
+        print(f"YES {r['date']} {r['channel']} — {(r['summary'] or '')[:120]}")
         return
-    # registros antigos (antes da tabela contatos) só existem como texto na obs das candidaturas
-    extra = " AND (obs LIKE '%DM%' OR fonte LIKE '%Messag%')" if a.canal == "linkedin-dm" else ""
-    r = con.execute("SELECT id,data FROM candidaturas WHERE data>=? AND (empresa LIKE ? OR obs LIKE ?)" + extra +
-                    " ORDER BY data DESC LIMIT 1", (desde, f"%{a.pessoa}%", f"%{a.pessoa}%")).fetchone()
+    # older records (before the contacts table) only exist as text in the application notes
+    extra = " AND (notes LIKE '%DM%' OR source LIKE '%Messag%')" if a.channel == "linkedin-dm" else ""
+    r = con.execute("SELECT id,date FROM applications WHERE date>=? AND (company LIKE ? OR notes LIKE ?)" + extra +
+                    " ORDER BY date DESC LIMIT 1", (since, f"%{a.person}%", f"%{a.person}%")).fetchone()
     if r:
-        print(f"POSSIVEL nome citado na candidatura id={r['id']} de {r['data']} — trate como SIM")
+        print(f"POSSIBLE name cited in application id={r['id']} on {r['date']} — treat as YES")
         return
-    print("NAO")
+    print("NO")
 
 
-def cmd_social_hoje(a):
-    con = conectar(somente_leitura=True)
-    teto = int(_caps().get("social_per_day", 0))
-    n = con.execute("SELECT COUNT(*) FROM contatos WHERE direcao='enviado' AND canal LIKE 'linkedin-%' AND canal<>'linkedin-interesse' AND data=?",
-                    (hoje(),)).fetchone()[0]
-    print(f"SOCIAL_HOJE={n} TETO={teto} RESTAM={max(0, teto - n)}")
+def cmd_social_today(a):
+    con = connect(read_only=True)
+    cap = int(_caps().get("social_per_day", 0))
+    n = con.execute("SELECT COUNT(*) FROM contacts WHERE direction='sent' AND channel LIKE 'linkedin-%' AND channel<>'linkedin-interest' AND date=?",
+                    (today(),)).fetchone()[0]
+    print(f"SOCIAL_TODAY={n} CAP={cap} REMAINING={max(0, cap - n)}")
 
 
-def cmd_interesse_check(a):
-    """Pode clicar "I'm interested" na página da empresa? Uma vez a cada N dias por empresa, teto diário, nunca o empregador atual."""
-    con = conectar(somente_leitura=True)
-    teto = int(_caps().get("interest_per_day", 0))
-    cooldown_dias = int(_caps().get("interest_cooldown_days", 180))
-    empregador = _empregador_atual()
-    emp = slug(a.empresa)
-    emp_alnum = re.sub(r"[^a-z0-9]", "", emp)
-    if any(e and e in emp_alnum for e in empregador):
-        print("NAO empregador-atual")
+def cmd_interest_check(a):
+    """May we click "I'm interested" on the company page? Once every N days per company, daily cap, never the current employer."""
+    con = connect(read_only=True)
+    cap = int(_caps().get("interest_per_day", 0))
+    cooldown_days = int(_caps().get("interest_cooldown_days", 180))
+    employer = _current_employer()
+    comp = slug(a.company)
+    comp_alnum = re.sub(r"[^a-z0-9]", "", comp)
+    if any(e and e in comp_alnum for e in employer):
+        print("NO current-employer")
         return
-    n = con.execute("SELECT COUNT(*) FROM contatos WHERE direcao='enviado' AND canal='linkedin-interesse' AND data=?",
-                    (hoje(),)).fetchone()[0]
-    if n >= teto:
-        print(f"NAO teto-diario ({n}/{teto})")
+    n = con.execute("SELECT COUNT(*) FROM contacts WHERE direction='sent' AND channel='linkedin-interest' AND date=?",
+                    (today(),)).fetchone()[0]
+    if n >= cap:
+        print(f"NO daily-cap ({n}/{cap})")
         return
-    desde = (datetime.date.today() - datetime.timedelta(days=cooldown_dias)).isoformat()
-    r = con.execute("SELECT data FROM contatos WHERE canal='linkedin-interesse' AND direcao='enviado' AND pessoa_norm=? AND data>=? ORDER BY data DESC LIMIT 1",
-                    (emp, desde)).fetchone()
+    since = (datetime.date.today() - datetime.timedelta(days=cooldown_days)).isoformat()
+    r = con.execute("SELECT date FROM contacts WHERE channel='linkedin-interest' AND direction='sent' AND person_norm=? AND date>=? ORDER BY date DESC LIMIT 1",
+                    (comp, since)).fetchone()
     if r:
-        print(f"NAO ja-sinalizado {r['data']}")
+        print(f"NO already-signaled {r['date']}")
         return
-    print(f"SIM (hoje {n}/{teto})")
+    print(f"YES (today {n}/{cap})")
 
 
-def _ler_texto(a):
-    if a.arquivo:
-        with open(a.arquivo, encoding="utf-8") as f:
+def cmd_interest_pending(a):
+    """Companies with a high-fit (or in-process) application in the last N days that have not received "I'm interested" yet."""
+    con = connect(read_only=True)
+    cooldown_days = int(_caps().get("interest_cooldown_days", 180))
+    employer = _current_employer()
+    since = (datetime.date.today() - datetime.timedelta(days=a.days)).isoformat()
+    since_cd = (datetime.date.today() - datetime.timedelta(days=cooldown_days)).isoformat()
+    done = {r[0] for r in con.execute("SELECT person_norm FROM contacts WHERE channel='linkedin-interest' AND direction='sent' AND date>=?", (since_cd,))}
+    rows = con.execute("SELECT id,date,company,title,fit,status FROM applications WHERE date>=? AND status NOT IN ('rejected','withdrawn','uncertain') "
+                       "AND (fit>=? OR status IN ('in-process','interview','test-pending')) ORDER BY COALESCE(fit,0) DESC, date DESC",
+                       (since, a.min_fit)).fetchall()
+    seen, n = set(), 0
+    for r in rows:
+        comp = slug(r["company"])
+        comp_alnum = re.sub(r"[^a-z0-9]", "", comp)
+        if comp in done or comp in seen or any(e and e in comp_alnum for e in employer):
+            continue
+        seen.add(comp)
+        print(f"{r['company']}\tapplication={r['id']}\tfit={r['fit']}\t{r['status']}\t{r['date']}\t{r['title']}")
+        n += 1
+        if n >= a.limit:
+            break
+    if not n:
+        print("(none)")
+
+
+def _read_text(a):
+    if a.file:
+        with open(a.file, encoding="utf-8") as f:
             return f.read().strip()
-    return (a.texto or "").strip()
+    return (a.text or "").strip()
 
 
 def cmd_add_post(a):
-    texto = _ler_texto(a)
-    if not texto:
-        erro("texto vazio (use --arquivo ou --texto)")
-    if a.imagem and not os.path.exists(a.imagem):
-        erro(f"imagem não existe: {a.imagem}")
-    con = conectar()
-    cur = con.execute("INSERT INTO posts (ordem,tema,gancho,texto,imagem,obs) VALUES (?,?,?,?,?,?)",
-                      (a.ordem, a.tema, a.gancho, texto, a.imagem, a.obs))
+    text = _read_text(a)
+    if not text:
+        fail("empty text (use --file or --text)")
+    _block_secret(text, a.hook, a.notes)  # hook is published externally (post-next/show) — guard it too
+    if a.image and not os.path.exists(a.image):
+        fail(f"image does not exist: {a.image}")
+    con = connect()
+    cur = con.execute("INSERT INTO posts (position,topic,hook,text,image,notes) VALUES (?,?,?,?,?,?)",
+                      (a.position, a.topic, a.hook, text, a.image, a.notes))
     con.commit()
-    print(f"OK post id={cur.lastrowid} status=rascunho ({len(texto)} caracteres)")
+    print(f"OK post id={cur.lastrowid} status=draft ({len(text)} characters)")
 
 
 def cmd_posts(a):
-    con = conectar(somente_leitura=True)
-    q, args = "SELECT id,ordem,status,tema,gancho,length(texto) AS chars,CASE WHEN imagem IS NULL THEN '' ELSE 'sim' END AS img,publicado_em FROM posts", []
+    con = connect(read_only=True)
+    q, args = "SELECT id,position,status,topic,hook,length(text) AS chars,CASE WHEN image IS NULL THEN '' ELSE 'yes' END AS img,published_at FROM posts", []
     if a.status:
         q, args = q + " WHERE status=?", [a.status]
-    imprimir(con.execute(q + " ORDER BY CASE status WHEN 'publicado' THEN 1 ELSE 0 END, ordem, id", args))
+    show(con.execute(q + " ORDER BY CASE status WHEN 'published' THEN 1 ELSE 0 END, position, id", args))
 
 
 def cmd_post_show(a):
-    con = conectar(somente_leitura=True)
+    con = connect(read_only=True)
     r = con.execute("SELECT * FROM posts WHERE id=?", (a.id,)).fetchone()
     if not r:
-        erro(f"post {a.id} não existe")
-    print(f"# post {r['id']} — {r['status']} — tema: {r['tema']} — gancho: {r['gancho']} — imagem: {r['imagem'] or 'nenhuma'}")
-    print(r["texto"])
+        fail(f"post {a.id} does not exist")
+    print(f"# post {r['id']} — {r['status']} — topic: {r['topic']} — hook: {r['hook']} — image: {r['image'] or 'none'}")
+    print(r["text"])
 
 
 def cmd_post_status(a):
-    con = conectar()
-    n = con.execute("UPDATE posts SET status=?, obs=COALESCE(obs||' | ','')||COALESCE(?,''), atualizado_em=datetime('now','localtime') WHERE id=?",
-                    (a.status, a.obs, a.id)).rowcount
+    _block_secret(a.notes)
+    con = connect()
+    n = con.execute("UPDATE posts SET status=?, notes=COALESCE(notes||' | ','')||COALESCE(?,''), updated_at=datetime('now','localtime') WHERE id=?",
+                    (a.status, a.notes, a.id)).rowcount
     con.commit()
-    print(f"OK post {a.id} → {a.status}" if n else f"ERRO post {a.id} não existe")
+    print(f"OK post {a.id} → {a.status}" if n else f"ERROR post {a.id} does not exist")
 
 
-def cmd_post_editar(a):
-    texto = _ler_texto(a)
-    if not texto:
-        erro("texto vazio")
-    con = conectar()
-    n = con.execute("UPDATE posts SET texto=?, status='rascunho', atualizado_em=datetime('now','localtime') WHERE id=? AND status<>'publicado'",
-                    (texto, a.id)).rowcount
+def cmd_post_edit(a):
+    text = _read_text(a)
+    if not text:
+        fail("empty text")
+    _block_secret(text)
+    con = connect()
+    n = con.execute("UPDATE posts SET text=?, status='draft', updated_at=datetime('now','localtime') WHERE id=? AND status<>'published'",
+                    (text, a.id)).rowcount
     con.commit()
-    print(f"OK post {a.id} atualizado (volta para rascunho — precisa de nova aprovação)" if n else "ERRO post inexistente ou já publicado")
+    print(f"OK post {a.id} updated (back to draft — needs approval again)" if n else "ERROR post missing or already published")
 
 
-def cmd_post_proximo(a):
-    """Rotina: há post para publicar hoje? Só 'aprovado', só se o último publicado foi há >= INTERVALO dias."""
-    con = conectar(somente_leitura=True)
-    intervalo = int(_caps().get("post_interval_days", 7))
-    ult = con.execute("SELECT MAX(publicado_em) FROM posts WHERE status='publicado'").fetchone()[0]
-    if ult:
-        prox = datetime.date.fromisoformat(ult[:10]) + datetime.timedelta(days=intervalo)
-        if datetime.date.today() < prox:
-            print(f"AGUARDAR proximo em {prox.isoformat()} (último publicado {ult[:10]})")
+def cmd_post_next(a):
+    """Routine: is there a post to publish today? Only 'approved', only if the last one was published >= INTERVAL days ago."""
+    con = connect(read_only=True)
+    interval = int(_caps().get("post_interval_days", 7))
+    last = con.execute("SELECT MAX(published_at) FROM posts WHERE status='published'").fetchone()[0]
+    if last:
+        nxt = datetime.date.fromisoformat(last[:10]) + datetime.timedelta(days=interval)
+        if datetime.date.today() < nxt:
+            print(f"WAIT next on {nxt.isoformat()} (last published {last[:10]})")
             return
-    r = con.execute("SELECT * FROM posts WHERE status='aprovado' ORDER BY ordem, id LIMIT 1").fetchone()
+    r = con.execute("SELECT * FROM posts WHERE status='approved' ORDER BY position, id LIMIT 1").fetchone()
     if not r:
-        print("FILA_VAZIA (nenhum post aprovado)")
+        print("QUEUE_EMPTY (no approved post)")
         return
-    print(f"PUBLICAR id={r['id']} imagem={r['imagem'] or 'nenhuma'}")
+    print(f"PUBLISH id={r['id']} image={r['image'] or 'none'}")
     print("-----")
-    print(r["texto"])
+    print(r["text"])
 
 
-def cmd_post_publicado(a):
-    con = conectar()
-    n = con.execute("UPDATE posts SET status='publicado', publicado_em=?, url=?, atualizado_em=datetime('now','localtime') WHERE id=? AND status='aprovado'",
-                    (agora(), a.url, a.id)).rowcount
+def cmd_post_published(a):
+    con = connect()
+    n = con.execute("UPDATE posts SET status='published', published_at=?, url=?, updated_at=datetime('now','localtime') WHERE id=? AND status='approved'",
+                    (now(), a.url, a.id)).rowcount
     con.commit()
-    print(f"OK post {a.id} publicado" if n else f"ERRO post {a.id} não está 'aprovado'")
-
-
-def cmd_interesse_pendentes(a):
-    """Empresas com candidatura de fit alto (ou em processo) nos últimos N dias que ainda não receberam "I'm interested"."""
-    con = conectar(somente_leitura=True)
-    cooldown_dias = int(_caps().get("interest_cooldown_days", 180))
-    empregador = _empregador_atual()
-    desde = (datetime.date.today() - datetime.timedelta(days=a.dias)).isoformat()
-    desde_cd = (datetime.date.today() - datetime.timedelta(days=cooldown_dias)).isoformat()
-    feitas = {r[0] for r in con.execute("SELECT pessoa_norm FROM contatos WHERE canal='linkedin-interesse' AND direcao='enviado' AND data>=?", (desde_cd,))}
-    rows = con.execute("SELECT id,data,empresa,titulo,fit,status FROM candidaturas WHERE data>=? AND status NOT IN ('rejeitada','desistiu','incerta') "
-                       "AND (fit>=? OR status IN ('em-processo','entrevista','teste-pendente')) ORDER BY COALESCE(fit,0) DESC, data DESC",
-                       (desde, a.min_fit)).fetchall()
-    vistos, n = set(), 0
-    for r in rows:
-        emp = slug(r["empresa"])
-        emp_alnum = re.sub(r"[^a-z0-9]", "", emp)
-        if emp in feitas or emp in vistos or any(e and e in emp_alnum for e in empregador):
-            continue
-        vistos.add(emp)
-        print(f"{r['empresa']}	candidatura={r['id']}	fit={r['fit']}	{r['status']}	{r['data']}	{r['titulo']}")
-        n += 1
-        if n >= a.limite:
-            break
-    if not n:
-        print("(nenhuma)")
+    print(f"OK post {a.id} published" if n else f"ERROR post {a.id} is not 'approved'")
 
 
 def cmd_linkedin_status(a):
-    con = conectar(somente_leitura=True)
-    r = con.execute("SELECT data,detalhe FROM sites_bloqueados WHERE motivo='linkedin-bloqueio' AND status='bloqueado' ORDER BY data DESC LIMIT 1").fetchone()
-    print(f"BLOQUEADO desde {r['data']} — só volta quando você marcar resolvido ({(r['detalhe'] or '')[:100]})" if r else "OK")
+    con = connect(read_only=True)
+    r = con.execute("SELECT date,detail FROM blocked_sites WHERE reason='linkedin-block' AND status='blocked' ORDER BY date DESC LIMIT 1").fetchone()
+    print(f"BLOCKED since {r['date']} — only resumes once you mark it resolved ({(r['detail'] or '')[:100]})" if r else "OK")
 
 
-LOCK = "NAVEGADOR_LOCK"
+LOCK = "BROWSER_LOCK"
 
 
 def cmd_lock(a):
-    if a.acao == "esperar":
-        # Espera DENTRO da chamada (a rotina não pode encerrar o turno para esperar: execução agendada não volta sozinha).
+    if a.action == "wait":
+        # Wait INSIDE the call (a routine cannot end its turn to wait: a scheduled run does not wake up again).
         import subprocess, time
-        fim = time.time() + a.minutos * 60
+        end = time.time() + a.minutes * 60
         while True:
-            r = subprocess.run([sys.executable, os.path.abspath(__file__), "lock", "adquirir", "--dono", a.dono,
+            r = subprocess.run([sys.executable, os.path.abspath(__file__), "lock", "acquire", "--owner", a.owner,
                                 "--ttl-min", str(a.ttl_min)], capture_output=True, text=True, encoding="utf-8")
             if r.returncode == 0:
                 print(r.stdout.strip())
                 return
-            if time.time() + 30 > fim:
-                print(r.stdout.strip() + f" — ainda ocupado após {a.minutos} min")
+            if time.time() + 30 > end:
+                print(r.stdout.strip() + f" — still busy after {a.minutes} min")
                 sys.exit(3)
             time.sleep(30)
-    con = conectar()
+    con = connect()
     con.execute("BEGIN IMMEDIATE")
-    r = con.execute("SELECT valor FROM controle WHERE chave=?", (LOCK,)).fetchone()
-    agora_dt = datetime.datetime.now()
-    dono_atual, desde = None, None
+    r = con.execute("SELECT value FROM control WHERE key=?", (LOCK,)).fetchone()
+    now_dt = datetime.datetime.now()
+    holder, since = None, None
     if r and r[0]:
-        dono_atual, _, ts = r[0].partition("|")
-        desde = datetime.datetime.fromisoformat(ts)
-    if a.acao == "check":
+        holder, _, ts = r[0].partition("|")
+        since = datetime.datetime.fromisoformat(ts)
+    if a.action == "check":
         con.rollback()
-        if dono_atual == a.dono:
-            print(f"OK lock ativo de {a.dono}")
+        if holder == a.owner:
+            print(f"OK lock held by {a.owner}")
             return
-        print(f"PARE: a trava não é mais de {a.dono} (atual: {dono_atual or 'ninguém'}) — a execução que te disparou acabou")
+        print(f"STOP: the lock no longer belongs to {a.owner} (now: {holder or 'nobody'}) — the run that started you has ended")
         sys.exit(4)
-    if a.acao == "adquirir":
-        expirado = desde is None or agora_dt - desde > datetime.timedelta(minutes=a.ttl_min)
-        if dono_atual and dono_atual != a.dono and not expirado:
+    if a.action == "acquire":
+        expired = since is None or now_dt - since > datetime.timedelta(minutes=a.ttl_min)
+        if holder and holder != a.owner and not expired:
             con.rollback()
-            print(f"OCUPADO por {dono_atual} desde {desde:%H:%M}")
+            print(f"BUSY held by {holder} since {since:%H:%M}")
             sys.exit(3)
-        con.execute("INSERT INTO controle (chave,valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor, atualizado_em=datetime('now','localtime')",
-                    (LOCK, f"{a.dono}|{agora_dt:%Y-%m-%dT%H:%M:%S}"))
+        con.execute("INSERT INTO control (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now','localtime')",
+                    (LOCK, f"{a.owner}|{now_dt:%Y-%m-%dT%H:%M:%S}"))
         con.commit()
-        print(f"OK lock={a.dono}" + (f" (tomado de {dono_atual}, expirado)" if dono_atual and dono_atual != a.dono else ""))
+        print(f"OK lock={a.owner}" + (f" (taken from {holder}, expired)" if holder and holder != a.owner else ""))
     else:
-        if dono_atual == a.dono:
-            con.execute("DELETE FROM controle WHERE chave=?", (LOCK,))
+        if holder == a.owner:
+            con.execute("DELETE FROM control WHERE key=?", (LOCK,))
         con.commit()
-        print("OK liberado" if dono_atual == a.dono else f"OK (lock era de {dono_atual or 'ninguém'}, nada feito)")
+        print("OK released" if holder == a.owner else f"OK (lock belonged to {holder or 'nobody'}, nothing done)")
 
 
-def cmd_controle(a):
-    if a.acao == "show":
-        imprimir(conectar(somente_leitura=True).execute("SELECT chave,valor,atualizado_em FROM controle ORDER BY chave"))
-    elif a.acao == "get":
-        r = conectar(somente_leitura=True).execute("SELECT valor FROM controle WHERE chave=?", (a.pares[0],)).fetchone()
+def cmd_control(a):
+    if a.action == "show":
+        show(connect(read_only=True).execute("SELECT key,value,updated_at FROM control ORDER BY key"))
+    elif a.action == "get":
+        r = connect(read_only=True).execute("SELECT value FROM control WHERE key=?", (a.pairs[0],)).fetchone()
         print(r[0] if r else "")
-    elif a.acao == "set":
-        con = conectar()
-        for p in a.pares:
+    elif a.action == "set":
+        con = connect()
+        for p in a.pairs:
             if "=" not in p:
-                erro(f"use CHAVE=valor (recebi {p})")
+                fail(f"use KEY=value (got {p})")
             k, v = p.split("=", 1)
             if v == "":
-                con.execute("DELETE FROM controle WHERE chave=?", (k.strip(),))
+                con.execute("DELETE FROM control WHERE key=?", (k.strip(),))
             else:
-                con.execute("INSERT INTO controle (chave,valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor, atualizado_em=datetime('now','localtime')",
+                con.execute("INSERT INTO control (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now','localtime')",
                             (k.strip(), v))
         con.commit()
         print("OK")
 
 
 def cmd_log(a):
-    _barra_segredo(a.texto)
-    con = conectar()
-    con.execute("INSERT INTO sessao_log (data_rodada,tipo,texto) VALUES (?,?,?)", (a.data_rodada or hoje(), a.tipo, a.texto))
+    _block_secret(a.text)
+    con = connect()
+    con.execute("INSERT INTO run_log (run_date,kind,text) VALUES (?,?,?)", (a.run_date or today(), a.kind, a.text))
     con.commit()
     print("OK")
 
 
 def cmd_logs(a):
-    imprimir(conectar(somente_leitura=True).execute(
-        "SELECT ts,tipo,texto FROM sessao_log WHERE data_rodada=? ORDER BY id", (a.data or hoje(),)))
+    show(connect(read_only=True).execute(
+        "SELECT ts,kind,text FROM run_log WHERE run_date=? ORDER BY id", (a.date or today(),)))
 
 
-def cmd_pendencia(a):
-    con = conectar()
-    if a.acao == "add":
-        _barra_segredo(a.descricao)
-        abertas = con.execute("SELECT id,descricao,url FROM pendencias WHERE status='aberta'").fetchall()
+def cmd_todo(a):
+    con = connect()
+    if a.action == "add":
+        _block_secret(a.description)
+        open_rows = con.execute("SELECT id,description,url FROM todos WHERE status='open'").fetchall()
         un = norm_url(a.url)
-        for p in abertas:
-            if (un and norm_url(p["url"]) == un) or _parecidos(slug(p["descricao"])[:120], slug(a.descricao)[:120]):
-                print(f"EXISTENTE pendencia id={p['id']} (já aberta: {p['descricao'][:100]})")
+        for p in open_rows:
+            if (un and norm_url(p["url"]) == un) or _similar(slug(p["description"])[:120], slug(a.description)[:120]):
+                print(f"EXISTING todo id={p['id']} (already open: {p['description'][:100]})")
                 return
-        cur = con.execute("INSERT INTO pendencias (data,descricao,prazo,url,candidatura_id) VALUES (?,?,?,?,?)",
-                          (hoje(), a.descricao, a.prazo, a.url, a.candidatura_id))
+        cur = con.execute("INSERT INTO todos (date,description,due,url,application_id) VALUES (?,?,?,?,?)",
+                          (today(), a.description, a.due, a.url, a.application_id))
         con.commit()
-        print(f"OK pendencia id={cur.lastrowid}")
-    elif a.acao in ("feita", "descartada"):
-        con.execute("UPDATE pendencias SET status=?, resolvido_em=datetime('now','localtime') WHERE id=?", (a.acao, a.id))
+        print(f"OK todo id={cur.lastrowid}")
+    elif a.action in ("done", "dismiss"):
+        st = "done" if a.action == "done" else "dismissed"
+        con.execute("UPDATE todos SET status=?, resolved_at=datetime('now','localtime') WHERE id=?", (st, a.id))
         con.commit()
-        print(f"OK pendencia id={a.id} {a.acao}")
+        print(f"OK todo id={a.id} {st}")
     else:
-        imprimir(con.execute("SELECT id,data,prazo,descricao,url FROM pendencias WHERE status='aberta' ORDER BY COALESCE(prazo,'9999'), id"))
+        output(con.execute("SELECT id,date,due,description,url,application_id FROM todos WHERE status='open' ORDER BY COALESCE(due,'9999'), id"), a.json)
 
 
-# Guarda anti-segredo: nunca gravar no banco o VALOR de documento, cartão ou senha — só a
-# descrição do campo. Rede de segurança de ALTA PRECISÃO (o agente já é instruído a nunca gravar
-# segredos): só bloqueia o que é claramente um segredo, para nunca descartar texto legítimo como
-# telefone (11 dígitos), datas ou ids. Aplicada a todo campo de texto livre no ponto de escrita.
-PARECE_DOC = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")   # CPF FORMATADO (pontuação exigida)
-PARECE_SENHA = re.compile(r"\b(senha|password|passwd|pwd|secret|token|api[_-]?key)\b\s*[:=]\s*\S+", re.I)
-_SEQ_LONGA = re.compile(r"(?:\d[ -]?){13,19}")              # candidato a cartão (validado por Luhn)
+# Anti-secret guard: never store the VALUE of a document, card or password — only the field's
+# description. HIGH-PRECISION safety net (the agent is already told never to store secrets): it
+# only blocks what is clearly a secret, so legitimate text such as a bare phone number, a date or
+# an id is never rejected. Applied to every free-text field at write time.
+# ACCEPTED LIMITATION (low recall by design): a bare, unlabeled 11-digit CPF (e.g. "12345678901")
+# is NOT caught — it is indistinguishable from a phone number, and rejecting it would produce false
+# positives on legitimate text. This guard is a backstop, not the primary control: the primary
+# control is the agent instruction to never write a secret. It DOES catch a formatted CPF, a
+# labeled national ID (cpf/rg/passport ... <digits>), a labeled password/token, and a Luhn-valid card.
+LOOKS_LIKE_DOC = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")   # FORMATTED Brazilian CPF (punctuation required)
+LOOKS_LIKE_ID = re.compile(r"\b(cpf|rg|passport|passaporte|national\s*id|ssn)\b\s*(?:n[oº.]*)?\s*[:=#]?\s*(?:\d[\d.\- ]{6,})", re.I)  # labeled national-ID value
+LOOKS_LIKE_PASSWORD = re.compile(r"\b(senha|password|passwd|pwd|secret|token|api[_-]?key)\b\s*[:=]\s*\S+", re.I)
+_LONG_SEQ = re.compile(r"(?:\d[ -]?){13,19}")                   # card candidate (validated by Luhn)
 
 
 def _luhn_ok(digits):
@@ -893,356 +1162,486 @@ def _luhn_ok(digits):
     return s % 10 == 0
 
 
-def _segredo_em(*campos):
-    """Devolve o motivo se algum campo parece conter um segredo real, senão None."""
-    for c in campos:
+def _secret_in(*fields):
+    """The reason if any field looks like it holds a real secret, else None."""
+    for c in fields:
         if not c:
             continue
-        if PARECE_DOC.search(c):
-            return "CPF formatado"
-        if PARECE_SENHA.search(c):
-            return "senha/token em texto plano"
-        for m in _SEQ_LONGA.finditer(c):
+        if LOOKS_LIKE_DOC.search(c) or LOOKS_LIKE_ID.search(c):
+            return "a national ID value (CPF/RG/passport)"
+        if LOOKS_LIKE_PASSWORD.search(c):
+            return "a plain-text password/token"
+        for m in _LONG_SEQ.finditer(c):
             if _luhn_ok(re.sub(r"\D", "", m.group())):
-                return "número de cartão (validado por Luhn)"
+                return "a card number (Luhn-valid)"
     return None
 
 
-def _barra_segredo(*campos):
-    m = _segredo_em(*campos)
+def _block_secret(*fields):
+    m = _secret_in(*fields)
     if m:
-        erro(f"texto parece conter {m} — descreva o campo (ex.: \"CPF obrigatório\"), nunca grave o valor")
+        fail(f"text seems to contain {m} — describe the field (e.g. \"national ID required\"), never store the value")
 
 
-def cmd_travada(a):
-    con = conectar()
-    if a.acao == "add":
-        if a.tipo not in TIPOS_TRAVADA:
-            erro(f"tipo inválido: {a.tipo} (válidos: {', '.join(TIPOS_TRAVADA)})")
-        _barra_segredo(a.campos, a.detalhe, a.obs, a.etapa)
+def cmd_stuck(a):
+    con = connect()
+    if a.action == "add":
+        if a.kind not in STUCK_KINDS:
+            fail(f"invalid kind: {a.kind} (valid: {', '.join(STUCK_KINDS)})")
+        _block_secret(a.fields, a.detail, a.notes, a.step)
         un = norm_url(a.url)
-        k = chave(a.empresa, a.titulo) if a.empresa else None
+        k = job_key(a.company, a.title) if a.company else None
         r = None
         if un:
-            r = con.execute("SELECT id,tipo FROM travadas WHERE url_norm=? AND status='aberta' LIMIT 1", (un,)).fetchone()
+            r = con.execute("SELECT id,kind FROM stuck_jobs WHERE url_norm=? AND status='open' LIMIT 1", (un,)).fetchone()
         if not r and k:
-            r = con.execute("SELECT id,tipo FROM travadas WHERE chave=? AND status='aberta' LIMIT 1", (k,)).fetchone()
+            r = con.execute("SELECT id,kind FROM stuck_jobs WHERE key=? AND status='open' LIMIT 1", (k,)).fetchone()
         if r:
-            print(f"EXISTENTE travada id={r['id']} tipo={r['tipo']} (já aberta)")
+            print(f"EXISTING stuck id={r['id']} kind={r['kind']} (already open)")
             return
         cur = con.execute(
-            "INSERT INTO travadas (data,tipo,empresa,titulo,chave,url,url_norm,url_form,site,rotina,fit,etapa,campos,detalhe,obs,candidatura_id)"
+            "INSERT INTO stuck_jobs (date,kind,company,title,key,url,url_norm,form_url,site,routine,fit,step,fields,detail,notes,application_id)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (a.data or hoje(), a.tipo, a.empresa, a.titulo, k, a.url, un, a.url_form, a.site, a.rotina, a.fit,
-             a.etapa, a.campos, a.detalhe, a.obs, a.candidatura_id))
+            (a.date or today(), a.kind, a.company, a.title, k, a.url, un, a.form_url, a.site, a.routine, a.fit,
+             a.step, a.fields, a.detail, a.notes, a.application_id))
         con.commit()
-        print(f"OK travada id={cur.lastrowid}")
-    elif a.acao in ("feita", "descartada"):
+        print(f"OK stuck id={cur.lastrowid}")
+    elif a.action in ("done", "dismiss"):
         if not a.id:
-            erro(f"travada {a.acao} exige --id")
-        con.execute("UPDATE travadas SET status=?, resolucao=COALESCE(?,resolucao), resolvido_em=datetime('now','localtime') WHERE id=?",
-                    (a.acao, a.resolucao, a.id))
+            fail(f"stuck {a.action} requires --id")
+        _block_secret(a.resolution)  # a stuck-job resolution is where a typed document/password could land
+        st = "done" if a.action == "done" else "dismissed"
+        con.execute("UPDATE stuck_jobs SET status=?, resolution=COALESCE(?,resolution), resolved_at=datetime('now','localtime') WHERE id=?",
+                    (st, a.resolution, a.id))
         con.commit()
-        print(f"OK travada id={a.id} {a.acao}")
+        print(f"OK stuck id={a.id} {st}")
     else:
-        cond, params = ["status=?"], [a.status or "aberta"]
-        if a.tipo:
-            cond.append("tipo=?"); params.append(a.tipo)
-        if a.rotina:
-            cond.append("rotina=?"); params.append(a.rotina)
-        imprimir(con.execute(
-            f"SELECT id,data,tipo,empresa,titulo,fit,etapa,campos,url,url_form,site,rotina,detalhe FROM travadas WHERE {' AND '.join(cond)}"
-            " ORDER BY COALESCE(fit,0) DESC, id", params))
+        cond, params = ["status=?"], [a.status or "open"]
+        if a.kind:
+            cond.append("kind=?"); params.append(a.kind)
+        if a.routine:
+            cond.append("routine=?"); params.append(a.routine)
+        output(con.execute(
+            f"SELECT id,date,kind,company,title,fit,step,fields,url,form_url,site,routine,detail FROM stuck_jobs WHERE {' AND '.join(cond)}"
+            " ORDER BY COALESCE(fit,0) DESC, id", params), a.json)
 
 
-def cmd_relatorio(a):
-    con = conectar(somente_leitura=True)
-    d = a.data or hoje()
-    cands = con.execute("SELECT empresa,titulo,status,url,fonte FROM candidaturas WHERE data=? ORDER BY id", (d,)).fetchall()
-    validas = [c for c in cands if c["status"] != "incerta"]
-    incertas = [c for c in cands if c["status"] == "incerta"]
-    print(f"# Resumo {d} — {len(validas)} candidaturas\n")
-    print(f"## Candidaturas ({len(validas)})")
-    for c in validas:
-        print(f"- {c['empresa']} — {c['titulo']} — {c['status']} — {c['fonte'] or ''} — {c['url'] or 'sem URL'}")
-    if incertas:
-        print(f"\n## Incertas — enviadas sem confirmação, não contam ({len(incertas)})")
-        for c in incertas:
-            print(f"- {c['empresa']} — {c['titulo']} — {c['url'] or 'sem URL'}")
-    logs = con.execute("SELECT ts,tipo,texto FROM sessao_log WHERE data_rodada=? ORDER BY id", (d,)).fetchall()
+def cmd_report(a):
+    con = connect(read_only=True)
+    d = a.date or today()
+    apps = con.execute("SELECT company,title,status,url,source FROM applications WHERE date=? ORDER BY id", (d,)).fetchall()
+    valid = [c for c in apps if c["status"] != "uncertain"]
+    uncertain = [c for c in apps if c["status"] == "uncertain"]
+    print(f"# Summary {d} — {len(valid)} applications\n")
+    print(f"## Applications ({len(valid)})")
+    for c in valid:
+        print(f"- {c['company']} — {c['title']} — {c['status']} — {c['source'] or ''} — {c['url'] or 'no URL'}")
+    if uncertain:
+        print(f"\n## Uncertain — sent without confirmation, not counted ({len(uncertain)})")
+        for c in uncertain:
+            print(f"- {c['company']} — {c['title']} — {c['url'] or 'no URL'}")
+    logs = con.execute("SELECT ts,kind,text FROM run_log WHERE run_date=? ORDER BY id", (d,)).fetchall()
     if logs:
-        print("\n## Log da rodada")
+        print("\n## Run log")
         for l in logs:
-            print(f"- {l['ts'][11:16]} [{l['tipo']}] {l['texto']}")
-    novos_sites = con.execute("SELECT site,motivo,detalhe FROM sites_bloqueados WHERE data=?", (d,)).fetchall()
-    if novos_sites:
-        print("\n## Sites bloqueados hoje")
-        for s in novos_sites:
-            print(f"- {s['site']} — {s['motivo']} — {(s['detalhe'] or '')[:160]}")
-    novas_perg = con.execute("SELECT pergunta,resposta_agente FROM perguntas WHERE data=?", (d,)).fetchall()
-    if novas_perg:
-        print("\n## Perguntas novas (responder)")
-        for p in novas_perg:
-            print(f"- {p['pergunta'][:200]} → agente respondeu: {(p['resposta_agente'] or '')[:120]}")
-    trav = con.execute("SELECT id,data,tipo,empresa,titulo,fit,etapa,campos,url,url_form FROM travadas WHERE status='aberta'"
-                       " ORDER BY tipo, COALESCE(fit,0) DESC, id").fetchall()
-    if trav:
-        print(f"\n## Vagas travadas — você termina na mão ({len(trav)} abertas)")
-        tipo_atual = None
-        for t in trav:
-            if t["tipo"] != tipo_atual:
-                tipo_atual = t["tipo"]
-                print(f"\n**{tipo_atual}**")
+            print(f"- {l['ts'][11:16]} [{l['kind']}] {l['text']}")
+    new_sites = con.execute("SELECT site,reason,detail FROM blocked_sites WHERE date=?", (d,)).fetchall()
+    if new_sites:
+        print("\n## Sites blocked today")
+        for s in new_sites:
+            print(f"- {s['site']} — {s['reason']} — {(s['detail'] or '')[:160]}")
+    new_q = con.execute("SELECT question,agent_answer FROM questions WHERE date=?", (d,)).fetchall()
+    if new_q:
+        print("\n## New questions (please answer)")
+        for p in new_q:
+            print(f"- {p['question'][:200]} → agent answered: {(p['agent_answer'] or '')[:120]}")
+    stuck = con.execute("SELECT id,date,kind,company,title,fit,step,fields,url,form_url FROM stuck_jobs WHERE status='open'"
+                        " ORDER BY kind, COALESCE(fit,0) DESC, id").fetchall()
+    if stuck:
+        print(f"\n## Stuck jobs — you finish by hand ({len(stuck)} open)")
+        kind = None
+        for t in stuck:
+            if t["kind"] != kind:
+                kind = t["kind"]
+                print(f"\n**{kind}**")
             fit = f" (fit {t['fit']})" if t["fit"] else ""
-            onde = f" — parou em: {t['etapa']}" if t["etapa"] else ""
-            faltam = f" — falta: {t['campos']}" if t["campos"] else ""
-            link = t["url_form"] or t["url"] or "sem URL"
-            print(f"- #{t['id']} {t['empresa'] or '?'} — {t['titulo'] or '?'}{fit}{onde}{faltam} — {link}")
-    pend = con.execute("SELECT id,prazo,descricao,url FROM pendencias WHERE status='aberta' ORDER BY COALESCE(prazo,'9999'), id").fetchall()
-    print(f"\n## Precisa de você ({len(pend)} abertas)")
-    for p in pend:
-        prazo = f"[prazo {p['prazo']}] " if p["prazo"] else ""
-        print(f"- #{p['id']} {prazo}{p['descricao']}" + (f" — {p['url']}" if p["url"] else ""))
+            where = f" — stopped at: {t['step']}" if t["step"] else ""
+            missing = f" — missing: {t['fields']}" if t["fields"] else ""
+            link = t["form_url"] or t["url"] or "no URL"
+            print(f"- #{t['id']} {t['company'] or '?'} — {t['title'] or '?'}{fit}{where}{missing} — {link}")
+    todos = con.execute("SELECT id,due,description,url FROM todos WHERE status='open' ORDER BY COALESCE(due,'9999'), id").fetchall()
+    print(f"\n## Needs you ({len(todos)} open)")
+    for p in todos:
+        due = f"[due {p['due']}] " if p["due"] else ""
+        print(f"- #{p['id']} {due}{p['description']}" + (f" — {p['url']}" if p["url"] else ""))
 
 
-RESPONDEU = ("em-processo", "entrevista", "oferta", "teste-pendente", "rejeitada")
-ENTREVISTOU = ("entrevista", "oferta")
+REPLIED = ("in-process", "interview", "offer", "test-pending", "rejected")
+INTERVIEWED = ("interview", "offer")
 
 
-def cmd_metricas(a):
-    """Funil e taxa de resposta por fonte — só agrega o que já está no banco."""
-    con = conectar(somente_leitura=True)
-    rows = con.execute("SELECT fonte,status FROM candidaturas WHERE status<>'incerta'").fetchall()
-    total = len(rows)
+def _funnel(rows, key):
     agg = {}
     for r in rows:
-        fonte = (r["fonte"] or "(sem fonte)").split(" ")[0]
-        d = agg.setdefault(fonte, {"n": 0, "resp": 0, "entr": 0})
+        k = key(r)
+        d = agg.setdefault(k, {"n": 0, "resp": 0, "intv": 0})
         d["n"] += 1
-        if r["status"] in RESPONDEU:
-            d["resp"] += 1
-        if r["status"] in ENTREVISTOU:
-            d["entr"] += 1
-    resp_tot = sum(1 for r in rows if r["status"] in RESPONDEU)
-    entr_tot = sum(1 for r in rows if r["status"] in ENTREVISTOU)
+        d["resp"] += r["status"] in REPLIED
+        d["intv"] += r["status"] in INTERVIEWED
+    return sorted(agg.items(), key=lambda kv: -kv[1]["n"])
+
+
+def cmd_metrics(a):
+    """Funnel and reply rate per source and per résumé variant — only aggregates what is already in the database."""
+    con = connect(read_only=True)
+    rows = con.execute("SELECT source,status,resume FROM applications WHERE status<>'uncertain'").fetchall()
+    total = len(rows)
+    resp_tot = sum(1 for r in rows if r["status"] in REPLIED)
+    intv_tot = sum(1 for r in rows if r["status"] in INTERVIEWED)
     pct = lambda x, n: f"{(100 * x / n):.0f}%" if n else "—"
-    print(f"# Métricas — {total} candidaturas (exclui incertas)")
-    print(f"Taxa de resposta: {pct(resp_tot, total)} ({resp_tot}) | Taxa de entrevista: {pct(entr_tot, total)} ({entr_tot})\n")
-    print("fonte\tcandidaturas\trespostas\ttaxa_resp\tentrevistas\ttaxa_entr")
-    for fonte, d in sorted(agg.items(), key=lambda kv: -kv[1]["n"]):
-        print(f"{fonte}\t{d['n']}\t{d['resp']}\t{pct(d['resp'], d['n'])}\t{d['entr']}\t{pct(d['entr'], d['n'])}")
+    by_source = _funnel(rows, lambda r: r["source"].split(" ")[0] if r["source"] else "(no source)")
+    by_resume = _funnel(rows, lambda r: r["resume"] or "default")
+    if a.json:
+        conv = lambda items: [{"name": k, "applications": d["n"], "replies": d["resp"], "interviews": d["intv"]} for k, d in items]
+        print(json.dumps({"total": total, "replies": resp_tot, "interviews": intv_tot,
+                          "by_source": conv(by_source), "by_resume": conv(by_resume)}, ensure_ascii=False))
+        return
+    print(f"# Metrics — {total} applications (excludes uncertain)")
+    print(f"Reply rate: {pct(resp_tot, total)} ({resp_tot}) | Interview rate: {pct(intv_tot, total)} ({intv_tot})\n")
+    for label, items in (("source", by_source), ("resume", by_resume)):
+        print(f"{label}\tapplications\treplies\treply_rate\tinterviews\tinterview_rate")
+        for k, d in items:
+            print(f"{k}\t{d['n']}\t{d['resp']}\t{pct(d['resp'], d['n'])}\t{d['intv']}\t{pct(d['intv'], d['n'])}")
+        print()
 
 
 def cmd_followups(a):
-    """Candidaturas aplicadas/sem-retorno há >= N dias (default 7) — para follow-up (o agente/você decide)."""
-    con = conectar(somente_leitura=True)
-    limite = (datetime.date.today() - datetime.timedelta(days=a.dias)).isoformat()
+    """Applications applied/no-reply for >= N days (default 7) — follow-up candidates (the agent/you decide)."""
+    con = connect(read_only=True)
+    limit = (datetime.date.today() - datetime.timedelta(days=a.days)).isoformat()
     rows = con.execute(
-        "SELECT id,data,empresa,titulo,fonte,status,url FROM candidaturas "
-        "WHERE status IN ('aplicada','sem-retorno') AND data<=? ORDER BY data, id", (limite,)).fetchall()
-    if not rows:
-        print("(nenhuma)")
-        return
-    imprimir(rows)
+        "SELECT a.id,a.date,a.company,a.title,a.source,a.status,a.url,"
+        " (SELECT MAX(d.date) FROM drafts d WHERE d.application_id=a.id AND d.kind='follow-up') AS last_draft"
+        " FROM applications a WHERE a.status IN ('applied','no-reply') AND a.date<=? ORDER BY a.date, a.id", (limit,)).fetchall()
+    output(rows, a.json)
+
+
+def cmd_context(a):
+    """Everything known about one application, as JSON — the grounding input for drafts and interview prep."""
+    con = connect(read_only=True)
+    r = con.execute("SELECT * FROM applications WHERE id=?", (a.id,)).fetchone()
+    if not r:
+        fail(f"application id={a.id} does not exist")
+    comp = slug(r["company"])
+    ctx = {
+        "application": dict(r),
+        # interactions tied to this application, or with anyone at the same company
+        "contacts": [dict(x) for x in con.execute(
+            "SELECT date,person,company,channel,direction,summary,application_id FROM contacts ORDER BY date").fetchall()
+            if x["application_id"] == a.id or (x["company"] and slug(x["company"]) == comp)],
+        "people": [dict(x) for x in con.execute("SELECT name,company,role,profile_url,notes FROM people").fetchall()
+                   if x["company"] and slug(x["company"]) == comp],
+        "todos": [dict(x) for x in con.execute("SELECT date,description,status FROM todos WHERE application_id=?", (a.id,))],
+        "drafts": [dict(x) for x in con.execute("SELECT date,kind,path,status FROM drafts WHERE application_id=?", (a.id,))],
+        "answered_questions": [dict(x) for x in con.execute(
+            "SELECT question,official_answer FROM questions WHERE official_answer IS NOT NULL AND official_answer<>''")],
+        "drafts_dir": config.DRAFTS,
+    }
+    print(json.dumps(ctx, ensure_ascii=False, indent=1))
+
+
+def cmd_draft(a):
+    con = connect()
+    if a.action == "add":
+        if a.kind not in DRAFT_KINDS:
+            fail(f"invalid kind: {a.kind} (valid: {', '.join(DRAFT_KINDS)})")
+        if not a.path or not os.path.exists(a.path):
+            fail(f"draft file does not exist: {a.path}")
+        company, title = a.company, a.title
+        if a.application_id:
+            r = con.execute("SELECT company,title FROM applications WHERE id=?", (a.application_id,)).fetchone()
+            if not r:
+                fail(f"application id={a.application_id} does not exist")
+            company, title = company or r["company"], title or r["title"]
+        cur = con.execute("INSERT INTO drafts (date,kind,application_id,company,title,path) VALUES (?,?,?,?,?,?)",
+                          (today(), a.kind, a.application_id, company, title, os.path.abspath(a.path)))
+        con.commit()
+        print(f"OK draft id={cur.lastrowid}")
+    elif a.action in ("sent", "archive"):
+        if not a.id:
+            fail(f"draft {a.action} requires --id")
+        st = "sent" if a.action == "sent" else "archived"
+        n = con.execute("UPDATE drafts SET status=?, updated_at=datetime('now','localtime') WHERE id=?", (st, a.id)).rowcount
+        con.commit()
+        print(f"OK draft id={a.id} {st}" if n else f"ERROR draft id={a.id} does not exist")
+    else:
+        cond, args = "", []
+        if a.kind:
+            cond, args = " WHERE kind=?", [a.kind]
+        output(con.execute(f"SELECT id,date,kind,application_id,company,title,path,status FROM drafts{cond} ORDER BY id DESC", args), a.json)
+
+
+def cmd_ghost_check(a):
+    """Ghost-job score for one posting: GHOST=NN plus the signals behind it, and SKIP/OK against target.ghost_max."""
+    import filters
+    con = connect(read_only=True)
+    text = ""
+    if a.description_file:
+        with open(a.description_file, encoding="utf-8") as f:
+            text = f.read()
+    times, span = seen_stats(con, a.company, a.title)
+    score, signals = filters.ghost_score_detail(title=a.title, text=text, age_days=a.age_days,
+                                                times_seen=times, seen_span_days=span)
+    verdict = "SKIP" if score >= filters.GHOST_MAX else "OK"
+    print(f"GHOST={score} MAX={filters.GHOST_MAX} {verdict}" + (" — " + "; ".join(signals) if signals else ""))
+
+
+def cmd_pick_resume(a):
+    """Which résumé to attach for this job (variants in config.resume_variants)."""
+    text = ""
+    if a.description_file:
+        with open(a.description_file, encoding="utf-8") as f:
+            text = f.read()
+    p, name, hits = config.resume_for(a.title, text)
+    print(f"RESUME={p}\nVARIANT={name}\nHITS={hits}" + ("" if os.path.exists(p) else "\nWARNING:file-missing"))
 
 
 def cmd_sql(a):
-    con = conectar(somente_leitura=True)
+    con = connect(read_only=True)
     try:
-        imprimir(con.execute(a.consulta))
+        show(con.execute(a.query))
     except sqlite3.Error as e:
-        erro(f"{e}")
+        fail(f"{e}")
 
 
 def cmd_export(a):
-    con = conectar(somente_leitura=True)
-    pasta = config.VISAO
-    os.makedirs(pasta, exist_ok=True)
+    con = connect(read_only=True)
+    folder = config.VIEWS
+    os.makedirs(folder, exist_ok=True)
     if getattr(a, "csv", False):
         import csv
-        destino = os.path.join(pasta, "candidaturas.csv")
-        rows = con.execute("SELECT id,data,empresa,titulo,fonte,status,fit,url,obs FROM candidaturas ORDER BY data DESC, id DESC").fetchall()
-        with open(destino, "w", encoding="utf-8", newline="") as f:
+        dest = os.path.join(folder, "applications.csv")
+        cols = ("id", "date", "company", "title", "source", "status", "fit", "resume", "url", "notes")
+        rows = con.execute(f"SELECT {','.join(cols)} FROM applications ORDER BY date DESC, id DESC").fetchall()
+        with open(dest, "w", encoding="utf-8", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["id", "data", "empresa", "titulo", "fonte", "status", "fit", "url", "obs"])
+            w.writerow(cols)
             for r in rows:
-                w.writerow([r[c] for c in ("id", "data", "empresa", "titulo", "fonte", "status", "fit", "url", "obs")])
-        print(f"OK {destino}")
+                w.writerow([r[c] for c in cols])
+        print(f"OK {dest}")
         return
-    vistas = {
-        "candidaturas.md": "SELECT data,empresa,titulo,fonte,status,fit,url,obs FROM candidaturas ORDER BY data DESC, id DESC",
-        "pendencias.md": "SELECT id,data,prazo,descricao,url FROM pendencias WHERE status='aberta' ORDER BY COALESCE(prazo,'9999')",
-        "travadas.md": "SELECT id,data,tipo,empresa,titulo,fit,etapa,campos,url,url_form,site,rotina,detalhe FROM travadas WHERE status='aberta' ORDER BY tipo, COALESCE(fit,0) DESC",
-        "perguntas.md": "SELECT id,status,pergunta,resposta_agente,resposta_oficial FROM perguntas ORDER BY status, id",
-        "sites-bloqueados.md": "SELECT id,data,site,motivo,tentativas,status,detalhe FROM sites_bloqueados ORDER BY status, site",
+    views = {
+        "applications.md": "SELECT date,company,title,source,status,fit,resume,url,notes FROM applications ORDER BY date DESC, id DESC",
+        "todos.md": "SELECT id,date,due,description,url FROM todos WHERE status='open' ORDER BY COALESCE(due,'9999')",
+        "stuck-jobs.md": "SELECT id,date,kind,company,title,fit,step,fields,url,form_url,site,routine,detail FROM stuck_jobs WHERE status='open' ORDER BY kind, COALESCE(fit,0) DESC",
+        "questions.md": "SELECT id,status,question,agent_answer,official_answer FROM questions ORDER BY status, id",
+        "blocked-sites.md": "SELECT id,date,site,reason,attempts,status,detail FROM blocked_sites ORDER BY status, site",
+        "contacts.md": "SELECT name,company,role,profile_url,email,notes FROM people ORDER BY name",
     }
-    for nome, sql in vistas.items():
-        rows = con.execute(sql).fetchall()
-        cols = [d[0] for d in con.execute(sql).description]
-        with open(os.path.join(pasta, nome), "w", encoding="utf-8") as f:
-            f.write(f"> Gerado por `jobdb.py export` em {agora()} — só leitura; editar pelo jobdb.py.\n\n")
+    for name, sql in views.items():
+        cur = con.execute(sql)
+        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+        with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
+            f.write(f"> Generated by `jobdb.py export` at {now()} — read-only; edit through jobdb.py.\n\n")
             f.write("| " + " | ".join(cols) + " |\n|" + "---|" * len(cols) + "\n")
             for r in rows:
                 f.write("| " + " | ".join("" if r[c] is None else str(r[c]).replace("|", "/").replace("\n", " ") for c in cols) + " |\n")
-    print(f"OK {pasta}")
+    print(f"OK {folder}")
 
 
 # ---------- CLI ----------
 def main():
-    p = argparse.ArgumentParser(description="Aplica — banco do motor de candidatura (SQLite)")
+    p = argparse.ArgumentParser(description="Aplica — the apply engine's database (SQLite)")
     sp = p.add_subparsers(dest="cmd", required=True)
 
-    sp.add_parser("init", help="cria as tabelas (idempotente)").set_defaults(f=cmd_init)
-    sp.add_parser("check", help="health-check: arquivo, integridade e tabelas. Última linha OK ou ERRO:<motivo>").set_defaults(f=cmd_check)
-    sp.add_parser("backup", help=f"cópia consistente em backups/ (mantém {KEEP_BACKUPS})").set_defaults(f=cmd_backup)
+    sp.add_parser("init", help="create the tables (idempotent)").set_defaults(f=cmd_init)
+    sp.add_parser("check", help="health check: file, integrity and tables. Last line OK or ERROR:<reason>").set_defaults(f=cmd_check)
+    sp.add_parser("backup", help=f"consistent copy in backups/ (keeps {KEEP_BACKUPS})").set_defaults(f=cmd_backup)
 
-    s = sp.add_parser("dedup", help="NOVA | DUPLICADA ... | DESCARTADA-ANTES ... | VISTA-LEGADO ...")
-    s.add_argument("--url"); s.add_argument("--empresa"); s.add_argument("--titulo")
+    s = sp.add_parser("dedup", help="NEW | DUPLICATE ... | DISCARDED-BEFORE ... | STUCK ... | LEGACY-SEEN ...")
+    s.add_argument("--url"); s.add_argument("--company"); s.add_argument("--title")
     s.set_defaults(f=cmd_dedup)
 
-    s = sp.add_parser("add-candidatura", help="grava candidatura (roda dedup antes; exit 2 se duplicada)")
-    s.add_argument("--empresa", required=True); s.add_argument("--titulo", required=True)
-    s.add_argument("--fonte"); s.add_argument("--url"); s.add_argument("--data")
-    s.add_argument("--status", default="aplicada"); s.add_argument("--fit", type=int); s.add_argument("--obs")
-    s.add_argument("--force", action="store_true", help="só para vaga genuinamente diferente marcada DUPLICADA; nunca para DESCARTADA-ANTES")
-    s.add_argument("--motivo-force", help="obrigatório com --force; vira pendência para você revisar")
-    s.set_defaults(f=cmd_add_candidatura)
+    s = sp.add_parser("add-application", help="record an application (runs dedup first; exit 2 if duplicate)")
+    s.add_argument("--company", required=True); s.add_argument("--title", required=True)
+    s.add_argument("--source"); s.add_argument("--url"); s.add_argument("--date")
+    s.add_argument("--status", default="applied"); s.add_argument("--fit", type=int); s.add_argument("--notes")
+    s.add_argument("--resume", help="résumé variant name used (from pick-resume)")
+    s.add_argument("--force", action="store_true", help="only for a genuinely different job flagged DUPLICATE; never for DISCARDED-BEFORE")
+    s.add_argument("--force-reason", help="required with --force; becomes a to-do for you to review")
+    s.set_defaults(f=cmd_add_application)
 
-    s = sp.add_parser("update-candidatura", help="muda status e/ou anexa nota datada")
+    s = sp.add_parser("update-application", help="change status and/or append a dated note")
     s.add_argument("--id", type=int); s.add_argument("--url"); s.add_argument("--status")
-    s.add_argument("--obs-append"); s.add_argument("--fit", type=int)
-    s.set_defaults(f=cmd_update_candidatura)
+    s.add_argument("--notes-append"); s.add_argument("--fit", type=int)
+    s.set_defaults(f=cmd_update_application)
 
-    s = sp.add_parser("add-descarte", help="vaga que passou no dedup mas caiu no gate")
-    s.add_argument("--empresa", required=True); s.add_argument("--titulo", default="")
-    s.add_argument("--url"); s.add_argument("--fonte"); s.add_argument("--motivo", required=True); s.add_argument("--data")
-    s.set_defaults(f=cmd_add_descarte)
+    s = sp.add_parser("add-discard", help="job that passed dedup but failed the gate")
+    s.add_argument("--company", required=True); s.add_argument("--title", default="")
+    s.add_argument("--url"); s.add_argument("--source"); s.add_argument("--reason", required=True); s.add_argument("--date")
+    s.set_defaults(f=cmd_add_discard)
 
-    s = sp.add_parser("candidaturas", help="lista/busca candidaturas")
-    s.add_argument("--data"); s.add_argument("--status"); s.add_argument("--busca"); s.add_argument("--limite", default=50)
-    s.set_defaults(f=cmd_candidaturas)
+    s = sp.add_parser("applications", help="list/search applications (--json for the app's pipeline)")
+    s.add_argument("--date"); s.add_argument("--status"); s.add_argument("--search"); s.add_argument("--limit", default=50)
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(f=cmd_applications)
 
-    s = sp.add_parser("hoje", help="candidaturas do dia (CANDIDATURAS_CONTAM exclui incertas)")
-    s.add_argument("--data"); s.set_defaults(f=cmd_hoje)
+    s = sp.add_parser("today", help="today's applications (APPLICATIONS_COUNTED excludes uncertain)")
+    s.add_argument("--date"); s.set_defaults(f=cmd_today)
 
-    s = sp.add_parser("add-pergunta", help="pergunta sem resposta no material (dedup pelo texto)")
-    s.add_argument("--pergunta", required=True); s.add_argument("--tipo-campo"); s.add_argument("--empresa-vaga")
-    s.add_argument("--plataforma"); s.add_argument("--url"); s.add_argument("--resposta-agente"); s.add_argument("--data")
-    s.set_defaults(f=cmd_add_pergunta)
+    s = sp.add_parser("add-question", help="question with no answer in your material (dedup by text)")
+    s.add_argument("--question", required=True); s.add_argument("--field-type"); s.add_argument("--company")
+    s.add_argument("--platform"); s.add_argument("--url"); s.add_argument("--agent-answer"); s.add_argument("--date")
+    s.set_defaults(f=cmd_add_question)
 
-    s = sp.add_parser("perguntas", help="lista perguntas; --com-resposta = as que você já respondeu (valem já)")
-    s.add_argument("--status"); s.add_argument("--com-resposta", action="store_true")
-    s.set_defaults(f=cmd_perguntas)
+    s = sp.add_parser("questions", help="list questions; --answered = the ones you already answered (use them now)")
+    s.add_argument("--status"); s.add_argument("--answered", action="store_true"); s.add_argument("--json", action="store_true")
+    s.set_defaults(f=cmd_questions)
 
-    s = sp.add_parser("responder-pergunta", help="grava a resposta oficial")
-    s.add_argument("--id", type=int, required=True); s.add_argument("--resposta", required=True)
-    s.set_defaults(f=cmd_responder_pergunta)
+    s = sp.add_parser("answer-question", help="store the official answer")
+    s.add_argument("--id", type=int, required=True); s.add_argument("--answer", required=True)
+    s.set_defaults(f=cmd_answer_question)
 
-    s = sp.add_parser("add-site", help="site que travou cadastro/login (soma tentativa se já bloqueado)")
-    s.add_argument("--site", required=True); s.add_argument("--motivo", required=True)
-    s.add_argument("--url"); s.add_argument("--tentando"); s.add_argument("--detalhe"); s.add_argument("--data")
+    s = sp.add_parser("add-site", help="site that blocked signup/login (adds an attempt if already blocked)")
+    s.add_argument("--site", required=True); s.add_argument("--reason", required=True)
+    s.add_argument("--url"); s.add_argument("--attempting"); s.add_argument("--detail"); s.add_argument("--date")
     s.set_defaults(f=cmd_add_site)
 
-    s = sp.add_parser("update-site", help="marcar resolvido/descartado")
-    s.add_argument("--id", type=int, required=True); s.add_argument("--status"); s.add_argument("--resolucao")
+    s = sp.add_parser("update-site", help="mark resolved/dismissed")
+    s.add_argument("--id", type=int, required=True); s.add_argument("--status"); s.add_argument("--resolution")
     s.set_defaults(f=cmd_update_site)
 
-    sp.add_parser("sites-ativos", help="sites bloqueados/descartados + cooldown").set_defaults(f=cmd_sites_ativos)
+    sp.add_parser("active-sites", help="blocked/dismissed sites + cooldown").set_defaults(f=cmd_active_sites)
 
-    s = sp.add_parser("add-contato", help="contato com recrutador (DM, conexão, comentário, e-mail)")
-    s.add_argument("--pessoa", required=True); s.add_argument("--canal", required=True)
-    s.add_argument("--direcao", choices=("enviado", "recebido"), required=True)
-    s.add_argument("--empresa"); s.add_argument("--resumo"); s.add_argument("--candidatura-id", type=int); s.add_argument("--data")
-    s.set_defaults(f=cmd_add_contato)
+    s = sp.add_parser("add-contact", help="interaction with a person (DM, connection, comment, email, call, meeting)")
+    s.add_argument("--person", required=True); s.add_argument("--channel", required=True)
+    s.add_argument("--direction", choices=("sent", "received"), required=True)
+    s.add_argument("--company"); s.add_argument("--summary"); s.add_argument("--application-id", type=int); s.add_argument("--date")
+    s.set_defaults(f=cmd_add_contact)
 
-    s = sp.add_parser("contato-recente", help="regra dos 30 dias: SIM | POSSIVEL | NAO (use --canal linkedin-dm para a regra de DM)")
-    s.add_argument("--pessoa", required=True); s.add_argument("--dias", type=int, default=30)
-    s.add_argument("--canal", choices=CANAIS, help="só conta contatos deste canal (ex.: linkedin-dm)")
-    s.set_defaults(f=cmd_contato_recente)
+    s = sp.add_parser("person", help="CRM: create/update a person (company, role, profile URL, email, notes)")
+    s.add_argument("--name", required=True); s.add_argument("--company"); s.add_argument("--role")
+    s.add_argument("--profile-url"); s.add_argument("--email"); s.add_argument("--notes")
+    s.set_defaults(f=cmd_person)
 
-    x = sp.add_parser("interesse-check", help="pode clicar \"I'm interested\" na página da empresa no LinkedIn? (cooldown por empresa, teto diário, nunca o empregador atual)")
-    x.add_argument("--empresa", required=True)
-    x.set_defaults(f=cmd_interesse_check)
-    x = sp.add_parser("add-post", help="adiciona post à fila (status rascunho — você aprova)")
-    x.add_argument("--tema", required=True); x.add_argument("--gancho"); x.add_argument("--arquivo"); x.add_argument("--texto")
-    x.add_argument("--imagem"); x.add_argument("--ordem", type=int, default=100); x.add_argument("--obs")
-    x.set_defaults(f=cmd_add_post)
-    x = sp.add_parser("posts", help="lista a fila de posts"); x.add_argument("--status"); x.set_defaults(f=cmd_posts)
-    x = sp.add_parser("post-show", help="mostra o texto de um post"); x.add_argument("--id", type=int, required=True); x.set_defaults(f=cmd_post_show)
-    x = sp.add_parser("post-status", help="aprovar/descartar/voltar a rascunho")
-    x.add_argument("--id", type=int, required=True); x.add_argument("--status", required=True, choices=["rascunho", "aprovado", "descartado"]); x.add_argument("--obs")
-    x.set_defaults(f=cmd_post_status)
-    x = sp.add_parser("post-editar", help="troca o texto (volta para rascunho)")
-    x.add_argument("--id", type=int, required=True); x.add_argument("--arquivo"); x.add_argument("--texto"); x.set_defaults(f=cmd_post_editar)
-    x = sp.add_parser("post-proximo", help="rotina: post aprovado a publicar hoje? (intervalo de caps.post_interval_days)"); x.set_defaults(f=cmd_post_proximo)
-    x = sp.add_parser("post-publicado", help="marca post como publicado")
-    x.add_argument("--id", type=int, required=True); x.add_argument("--url"); x.set_defaults(f=cmd_post_publicado)
-    x = sp.add_parser("interesse-pendentes", help="empresas com candidatura fit alto/em processo ainda sem \"I'm interested\"")
-    x.add_argument("--dias", type=int, default=7)
+    s = sp.add_parser("contacts", help="CRM: people with last touch and counts")
+    s.add_argument("--search"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_contacts)
+
+    s = sp.add_parser("contact-history", help="CRM: every interaction with one person")
+    s.add_argument("--person", required=True); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_contact_history)
+
+    s = sp.add_parser("recent-contact", help="30-day rule: YES | POSSIBLE | NO (use --channel linkedin-dm for the DM rule)")
+    s.add_argument("--person", required=True); s.add_argument("--days", type=int, default=30)
+    s.add_argument("--channel", choices=CHANNELS, help="only count contacts on this channel (e.g. linkedin-dm)")
+    s.set_defaults(f=cmd_recent_contact)
+
+    x = sp.add_parser("interest-check", help="may we click \"I'm interested\" on the company's LinkedIn page? (per-company cooldown, daily cap, never the current employer)")
+    x.add_argument("--company", required=True)
+    x.set_defaults(f=cmd_interest_check)
+    x = sp.add_parser("interest-pending", help="companies with a high-fit/in-process application still without \"I'm interested\"")
+    x.add_argument("--days", type=int, default=7)
     x.add_argument("--min-fit", type=int, default=90)
-    x.add_argument("--limite", type=int, default=3)
-    x.set_defaults(f=cmd_interesse_pendentes)
-    sp.add_parser("social-hoje", help="ações sociais no LinkedIn enviadas hoje (todas as rotinas) vs teto (caps.social_per_day)").set_defaults(f=cmd_social_hoje)
-    sp.add_parser("linkedin-status", help="OK | BLOQUEADO (linkedin-bloqueio ainda não resolvido por você)").set_defaults(f=cmd_linkedin_status)
+    x.add_argument("--limit", type=int, default=3)
+    x.set_defaults(f=cmd_interest_pending)
 
-    s = sp.add_parser("lock", help="trava do navegador: adquirir (exit 3 = OCUPADO) | esperar (bloqueia até --minutos e já adquire; exit 3 = ainda ocupado) | liberar | check (subagente: exit 4 = PARE)")
-    s.add_argument("acao", choices=("adquirir", "esperar", "liberar", "check"))
-    s.add_argument("--minutos", type=float, default=9, help="esperar: tempo máximo desta chamada (≤9 para caber no limite de 10 min da ferramenta)"); s.add_argument("--dono", required=True)
-    s.add_argument("--ttl-min", type=int, default=150, help="lock mais velho que isso é considerado abandonado")
+    x = sp.add_parser("add-post", help="add a post to the queue (status draft — you approve)")
+    x.add_argument("--topic", required=True); x.add_argument("--hook"); x.add_argument("--file"); x.add_argument("--text")
+    x.add_argument("--image"); x.add_argument("--position", type=int, default=100); x.add_argument("--notes")
+    x.set_defaults(f=cmd_add_post)
+    x = sp.add_parser("posts", help="list the post queue"); x.add_argument("--status"); x.set_defaults(f=cmd_posts)
+    x = sp.add_parser("post-show", help="print a post's text"); x.add_argument("--id", type=int, required=True); x.set_defaults(f=cmd_post_show)
+    x = sp.add_parser("post-status", help="approve/dismiss/back to draft")
+    x.add_argument("--id", type=int, required=True); x.add_argument("--status", required=True, choices=["draft", "approved", "dismissed"]); x.add_argument("--notes")
+    x.set_defaults(f=cmd_post_status)
+    x = sp.add_parser("post-edit", help="replace the text (back to draft)")
+    x.add_argument("--id", type=int, required=True); x.add_argument("--file"); x.add_argument("--text"); x.set_defaults(f=cmd_post_edit)
+    x = sp.add_parser("post-next", help="routine: approved post to publish today? (interval caps.post_interval_days)"); x.set_defaults(f=cmd_post_next)
+    x = sp.add_parser("post-published", help="mark a post as published")
+    x.add_argument("--id", type=int, required=True); x.add_argument("--url"); x.set_defaults(f=cmd_post_published)
+
+    sp.add_parser("social-today", help="LinkedIn social actions sent today (all routines) vs cap (caps.social_per_day)").set_defaults(f=cmd_social_today)
+    sp.add_parser("linkedin-status", help="OK | BLOCKED (linkedin-block not yet resolved by you)").set_defaults(f=cmd_linkedin_status)
+
+    s = sp.add_parser("lock", help="browser lock: acquire (exit 3 = BUSY) | wait (blocks up to --minutes and acquires; exit 3 = still busy) | release | check (subagent: exit 4 = STOP)")
+    s.add_argument("action", choices=("acquire", "wait", "release", "check"))
+    s.add_argument("--minutes", type=float, default=9, help="wait: max time for this call (≤9 to fit the tool's 10-min limit)"); s.add_argument("--owner", required=True)
+    s.add_argument("--ttl-min", type=int, default=150, help="a lock older than this is considered abandoned")
     s.set_defaults(f=cmd_lock)
 
-    s = sp.add_parser("controle", help="bloco CONTROLE DE LOTE: show | get CHAVE | set CHAVE=valor ... (valor vazio apaga)")
-    s.add_argument("acao", choices=("show", "get", "set")); s.add_argument("pares", nargs="*")
-    s.set_defaults(f=cmd_controle)
+    s = sp.add_parser("control", help="key/value control block: show | get KEY | set KEY=value ... (empty value deletes)")
+    s.add_argument("action", choices=("show", "get", "set")); s.add_argument("pairs", nargs="*")
+    s.set_defaults(f=cmd_control)
 
-    s = sp.add_parser("log", help="linha de auditoria da rodada (lote, monitor, processos, obs)")
-    s.add_argument("--tipo", required=True); s.add_argument("--texto", required=True); s.add_argument("--data-rodada")
+    s = sp.add_parser("log", help="audit line for the run (batch, monitor, processes, notes)")
+    s.add_argument("--kind", required=True); s.add_argument("--text", required=True); s.add_argument("--run-date")
     s.set_defaults(f=cmd_log)
 
-    s = sp.add_parser("logs", help="log de uma rodada"); s.add_argument("--data"); s.set_defaults(f=cmd_logs)
+    s = sp.add_parser("logs", help="a run's log"); s.add_argument("--date"); s.set_defaults(f=cmd_logs)
 
-    s = sp.add_parser("pendencia", help="Precisa de você: list | add | feita | descartada")
-    s.add_argument("acao", choices=("list", "add", "feita", "descartada"))
-    s.add_argument("--id", type=int); s.add_argument("--descricao"); s.add_argument("--prazo")
-    s.add_argument("--url"); s.add_argument("--candidatura-id", type=int)
-    s.set_defaults(f=cmd_pendencia)
+    s = sp.add_parser("todo", help="Needs you: list | add | done | dismiss")
+    s.add_argument("action", choices=("list", "add", "done", "dismiss"))
+    s.add_argument("--id", type=int); s.add_argument("--description"); s.add_argument("--due")
+    s.add_argument("--url"); s.add_argument("--application-id", type=int); s.add_argument("--json", action="store_true")
+    s.set_defaults(f=cmd_todo)
 
-    s = sp.add_parser("travada", help="item que o agente não conseguiu terminar (documento, senha, cadastro novo, julgamento...) — add | list | feita | descartada")
-    s.add_argument("acao", choices=("list", "add", "feita", "descartada"))
-    s.add_argument("--id", type=int); s.add_argument("--tipo", help=" | ".join(TIPOS_TRAVADA))
-    s.add_argument("--empresa"); s.add_argument("--titulo"); s.add_argument("--url", help="link da vaga")
-    s.add_argument("--url-form", help="link da página/formulário onde parou")
-    s.add_argument("--site", help="plataforma (Gupy, Greenhouse, site da empresa...)")
-    s.add_argument("--rotina", help="add: quem registrou (ats, linkedin-jobs...) · list: filtra por ela")
-    s.add_argument("--fit", type=int); s.add_argument("--etapa", help="onde parou (ex.: 'passo 3/4 — dados pessoais')")
-    s.add_argument("--campos", help="campos que faltam, descritos — NUNCA o valor (ex.: 'documento, senha da conta')")
-    s.add_argument("--detalhe", help="mensagem literal do site / por que travou"); s.add_argument("--obs", help="o que já foi preenchido, dicas pra você")
-    s.add_argument("--candidatura-id", type=int); s.add_argument("--data")
-    s.add_argument("--status", help="list: aberta (padrão) | feita | descartada"); s.add_argument("--resolucao")
-    s.set_defaults(f=cmd_travada)
+    s = sp.add_parser("stuck", help="job the agent could not finish (document, password, new account, judgment...) — add | list | done | dismiss")
+    s.add_argument("action", choices=("list", "add", "done", "dismiss"))
+    s.add_argument("--id", type=int); s.add_argument("--kind", help=" | ".join(STUCK_KINDS))
+    s.add_argument("--company"); s.add_argument("--title"); s.add_argument("--url", help="job link")
+    s.add_argument("--form-url", help="link to the page/form where it stopped")
+    s.add_argument("--site", help="platform (Gupy, Greenhouse, company site...)")
+    s.add_argument("--routine", help="add: who recorded it (ats, linkedin-jobs...) · list: filter by it")
+    s.add_argument("--fit", type=int); s.add_argument("--step", help="where it stopped (e.g. 'step 3/4 — personal data')")
+    s.add_argument("--fields", help="missing fields, described — NEVER the value (e.g. 'national ID, account password')")
+    s.add_argument("--detail", help="the site's literal message / why it got stuck"); s.add_argument("--notes", help="what was already filled, tips for you")
+    s.add_argument("--application-id", type=int); s.add_argument("--date")
+    s.add_argument("--status", help="list: open (default) | done | dismissed"); s.add_argument("--resolution")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(f=cmd_stuck)
 
-    s = sp.add_parser("relatorio", help="resumo do dia em markdown (corpo do e-mail)")
-    s.add_argument("--data"); s.set_defaults(f=cmd_relatorio)
+    s = sp.add_parser("report", help="day summary in markdown (email body)")
+    s.add_argument("--date"); s.set_defaults(f=cmd_report)
 
-    s = sp.add_parser("metricas", help="funil e taxa de resposta/entrevista por fonte (só leitura)")
-    s.set_defaults(f=cmd_metricas)
+    s = sp.add_parser("metrics", help="funnel and reply/interview rate per source and per résumé variant (read-only)")
+    s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_metrics)
 
-    s = sp.add_parser("followups", help="candidaturas aplicadas/sem-retorno há >= N dias (para follow-up)")
-    s.add_argument("--dias", type=int, default=7); s.set_defaults(f=cmd_followups)
+    s = sp.add_parser("followups", help="applications applied/no-reply for >= N days (follow-up candidates)")
+    s.add_argument("--days", type=int, default=7); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_followups)
 
-    s = sp.add_parser("sql", help="consulta SOMENTE LEITURA"); s.add_argument("consulta"); s.set_defaults(f=cmd_sql)
-    s = sp.add_parser("export", help="gera visao/*.md legíveis (só leitura); --csv gera candidaturas.csv")
+    s = sp.add_parser("context", help="everything known about one application, as JSON (grounding for drafts/prep)")
+    s.add_argument("--id", type=int, required=True); s.set_defaults(f=cmd_context)
+
+    s = sp.add_parser("draft", help="grounded drafts (cover letter, follow-up, interview prep): list | add | sent | archive")
+    s.add_argument("action", choices=("list", "add", "sent", "archive"))
+    s.add_argument("--id", type=int); s.add_argument("--kind", help=" | ".join(DRAFT_KINDS)); s.add_argument("--application-id", type=int)
+    s.add_argument("--company"); s.add_argument("--title"); s.add_argument("--path"); s.add_argument("--json", action="store_true")
+    s.set_defaults(f=cmd_draft)
+
+    s = sp.add_parser("ghost-check", help="ghost-job score for a posting: GHOST=NN MAX=NN OK|SKIP — signals")
+    s.add_argument("--company", required=True); s.add_argument("--title", required=True)
+    s.add_argument("--age-days", type=int); s.add_argument("--description-file")
+    s.set_defaults(f=cmd_ghost_check)
+
+    s = sp.add_parser("pick-resume", help="which résumé variant to attach for a job (config.resume_variants)")
+    s.add_argument("--title", required=True); s.add_argument("--description-file")
+    s.set_defaults(f=cmd_pick_resume)
+
+    s = sp.add_parser("sql", help="READ-ONLY query"); s.add_argument("query"); s.set_defaults(f=cmd_sql)
+    s = sp.add_parser("export", help="write readable views/*.md (read-only); --csv writes applications.csv")
     s.add_argument("--csv", action="store_true"); s.set_defaults(f=cmd_export)
 
     a = p.parse_args()
-    if a.cmd == "pendencia" and a.acao == "add" and not a.descricao:
-        p.error("pendencia add exige --descricao")
-    if a.cmd == "travada" and a.acao == "add" and not (a.tipo and (a.url or a.url_form)):
-        p.error("travada add exige --tipo e --url (ou --url-form)")
-    if a.cmd == "pendencia" and a.acao in ("feita", "descartada") and not a.id:
-        p.error(f"pendencia {a.acao} exige --id")
-    if a.cmd == "controle" and a.acao == "get" and len(a.pares) != 1:
-        p.error("controle get exige 1 chave")
+    if a.cmd == "todo" and a.action == "add" and not a.description:
+        p.error("todo add requires --description")
+    if a.cmd == "stuck" and a.action == "add" and not (a.kind and (a.url or a.form_url)):
+        p.error("stuck add requires --kind and --url (or --form-url)")
+    if a.cmd == "todo" and a.action in ("done", "dismiss") and not a.id:
+        p.error(f"todo {a.action} requires --id")
+    if a.cmd == "draft" and a.action == "add" and not (a.kind and a.path):
+        p.error("draft add requires --kind and --path")
+    if a.cmd == "control" and a.action == "get" and len(a.pairs) != 1:
+        p.error("control get requires 1 key")
     a.f(a)
 
 

@@ -1,13 +1,13 @@
 ---
-description: Cria/atualiza as tarefas agendadas das rotinas do Aplica a partir de config.schedule (horários definidos no app).
+description: Create/update the Aplica routines' scheduled tasks from config.schedule (times set in the app).
 ---
 
-Leia `config.json` do config dir do Aplica (`python ${CLAUDE_PLUGIN_ROOT}/engine/config.py` mostra o caminho) e materialize o bloco `schedule` como tarefas agendadas reais, usando a ferramenta de tarefas agendadas do Claude Code (`mcp__scheduled-tasks__*`).
+Read the Aplica config dir's `config.json` (`python ${CLAUDE_PLUGIN_ROOT}/engine/config.py` prints the path) and materialize the `schedule` block as real scheduled tasks, using Claude Code's scheduled-tasks tool (`mcp__scheduled-tasks__*`).
 
-Para cada rotina em `config.schedule` (`ats`, `linkedin_jobs`, `recruiters`, `feed`, `summary`):
-- Se `enabled: false` → **remova** a tarefa agendada correspondente se existir (`delete_scheduled_task`) e siga.
-- Se `enabled: true` → para cada horário em `times` (HH:MM), **crie ou atualize** uma tarefa agendada (`create_scheduled_task`/`update_scheduled_task`) que, no horário, rode a rotina correspondente — o corpo da tarefa deve instruir o agente a seguir o template em `${CLAUDE_PLUGIN_ROOT}/scheduled-tasks/<rotina>/SKILL.md` (ex.: `ats` → `scheduled-tasks/ats-boards`, `linkedin_jobs` → `scheduled-tasks/linkedin-jobs`, `recruiters`, `feed`, `summary`). Converta HH:MM para o formato de agendamento que a ferramenta espera (cron diário naquele horário).
+For each routine in `config.schedule` (`ats`, `linkedin_jobs`, `recruiters`, `feed`, `summary`):
+- If `enabled: false` → **remove** the matching scheduled task if it exists (`delete_scheduled_task`) and move on.
+- If `enabled: true` → for each time in `times` (HH:MM), **create or update** a scheduled task (`create_scheduled_task`/`update_scheduled_task`) that, at that time, runs the matching routine — the task body should tell the agent to follow the template in `${CLAUDE_PLUGIN_ROOT}/scheduled-tasks/<routine>/SKILL.md` (e.g. `ats` → `scheduled-tasks/ats-boards`, `linkedin_jobs` → `scheduled-tasks/linkedin-jobs`, `recruiters`, `feed`, `summary`). Convert HH:MM into the scheduling format the tool expects (a daily cron at that time).
 
-Nomeie as tarefas de forma estável (ex.: `aplica-<rotina>-<HH><MM>`) para poder reconciliar em execuções futuras: liste as existentes (`list_scheduled_tasks`), crie as que faltam, atualize as que mudaram de horário e remova as que não estão mais no config (ou cuja rotina foi desligada). Nunca duplique.
+Name the tasks stably (e.g. `aplica-<routine>-<HH><MM>`) so you can reconcile on future runs: list the existing ones (`list_scheduled_tasks`), create the missing ones, update those whose time changed, and remove those no longer in the config (or whose routine was turned off). Never duplicate.
 
-Respeite os toggles: só agende `feed` se `behavior.feed_mode != off`. Ao final, liste para o usuário o que ficou agendado (rotina, horários) e o que foi removido.
+Respect the toggles: only schedule `feed` if `behavior.feed_mode != off`. At the end, list for the user what was scheduled (routine, times) and what was removed.
