@@ -1,6 +1,7 @@
 import React from 'react'
 import { Card } from '../ui'
 import { Icon } from '../icons'
+import { commonAnsweredCount } from '../questions'
 
 type Prereqs = {
   python: boolean; pythonBin: string | null
@@ -45,8 +46,7 @@ export default function Onboarding(props: {
   const tgt = (props.config || {}).target || {}
   const settings = props.onOpenSettings
   const nonEmpty = (v: any): boolean => Array.isArray(v) ? v.length > 0 : v && Object.keys(v).length > 0
-  const qa = prof.open_answers?.qa || {}
-  const commonAnswered = Object.values(qa).filter((x) => typeof x === 'string' && x.trim()).length
+  const commonAnswered = commonAnsweredCount(prof.open_answers?.qa || {})
   const checks: Check[] = [
     { label: 'Name', done: !!prof.identity?.full_name, go: () => settings('profile') },
     { label: 'Email', done: !!prof.identity?.email, go: () => settings('profile') },

@@ -120,11 +120,14 @@ function runEngine(args: string[]): Promise<{ code: number; stdout: string; stde
     }
     const env = { ...process.env, APLICA_HOME: configDir() }
     const child = spawn(py, [jobdbScript(), ...args], { env })
-    let stdout = '', stderr = ''
+    let stdout = '', stderr = '', done = false
+    const finish = (r: { code: number; stdout: string; stderr: string }): void => { if (done) return; done = true; clearTimeout(timer); resolve(r) }
+    // a engine nunca deve pendurar um caller: mata um processo preso após 2 min
+    const timer = setTimeout(() => { try { child.kill() } catch { /* ignore */ } finish({ code: -1, stdout, stderr: stderr + '\n[timeout]' }) }, 120000)
     child.stdout.on('data', (d) => (stdout += d.toString()))
     child.stderr.on('data', (d) => (stderr += d.toString()))
-    child.on('error', (e) => resolve({ code: -1, stdout, stderr: String(e) }))
-    child.on('close', (code) => resolve({ code: code ?? -1, stdout, stderr }))
+    child.on('error', (e) => finish({ code: -1, stdout, stderr: String(e) }))
+    child.on('close', (code) => finish({ code: code ?? -1, stdout, stderr }))
   })
 }
 
@@ -222,13 +225,15 @@ function registerIpc(): void {
       'paywall-assinatura': 'Paywall / subscription'
     }
     const li = await runEngine(['linkedin-status'])
-    if ((li.stdout || '').trim().startsWith('BLOQUEADO')) {
+    const liBlocked = (li.stdout || '').trim().startsWith('BLOQUEADO')
+    if (liBlocked) {
       out.push({ level: 'error', title: 'LinkedIn needs your attention', detail: li.stdout.trim() })
     }
     const sites = await runEngine(['sites-ativos'])
     for (const line of (sites.stdout || '').split('\n')) {
       const c = line.split('\t')
       if (c.length >= 4 && c[2] === 'bloqueado') {
+        if (liBlocked && c[3] === 'linkedin-bloqueio') continue // já reportado acima
         const label = motivoLabel[c[3]] || c[3]
         out.push({ level: 'warn', title: `${c[1]}: ${label}`, detail: `last seen ${c[5] || ''} ${c[6] || ''}`.trim() })
       }
@@ -307,12 +312,25 @@ function registerIpc(): void {
             const vers = await fs.readdir(verDir, { withFileTypes: true }).catch(() => [])
             for (const v of vers) {
               if (!v.isDirectory()) continue
-              const texts: string[] = []
-              for (const f of ['manifest.json', join('_locales', 'en', 'messages.json'), join('_locales', 'en_US', 'messages.json')]) {
-                try { texts.push(await fs.readFile(join(verDir, v.name, f), 'utf-8')) } catch { /* skip */ }
-              }
-              const blob = texts.join(' ').toLowerCase()
-              if (/"name"\s*:\s*"[^"]*claude|claude in chrome|anthropic/.test(blob)) { extFound = true }
+              const base = join(verDir, v.name)
+              let name = ''
+              try {
+                const man = JSON.parse(await fs.readFile(join(base, 'manifest.json'), 'utf-8'))
+                name = String(man.name || '')
+                const m = /^__MSG_(.+)__$/.exec(name)
+                if (m) {
+                  // resolve o nome localizado pelo default_locale (fallback en)
+                  const locales = [man.default_locale, 'en', 'en_US'].filter(Boolean)
+                  for (const loc of locales) {
+                    try {
+                      const msgs = JSON.parse(await fs.readFile(join(base, '_locales', loc, 'messages.json'), 'utf-8'))
+                      const entry = msgs[m[1]] || msgs[m[1].toLowerCase()]
+                      if (entry?.message) { name = String(entry.message); break }
+                    } catch { /* próximo locale */ }
+                  }
+                }
+              } catch { /* manifesto ilegível */ }
+              if (/claude/i.test(name)) { extFound = true; break }
             }
             if (extFound) break
           }
@@ -386,10 +404,10 @@ async function ensureDatabase(): Promise<void> {
   } catch { /* o onboarding mostra o estado do banco de qualquer forma */ }
 }
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   registerIpc()
-  await ensureDatabase()
-  createWindow()
+  createWindow() // a UI aparece sempre; o init do banco não bloqueia a janela
+  void ensureDatabase() // fire-and-forget; o onboarding reflete o estado do banco
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

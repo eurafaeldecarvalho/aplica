@@ -21,11 +21,13 @@ export default function SettingsModal(props: {
   onSaveProfile: (p: any) => Promise<void>
   onClose: () => void
 }): JSX.Element {
+  const onCloseRef = React.useRef(props.onClose)
+  onCloseRef.current = props.onClose
   React.useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') props.onClose() }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onCloseRef.current() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [props])
+  }, [])
 
   const s = props.section
   return (

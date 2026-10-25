@@ -1,26 +1,9 @@
 import React from 'react'
 import { Card, Field, TextArea, TagInput, SaveBar } from '../ui'
 
-const clone = (o: any): any => JSON.parse(JSON.stringify(o))
+import { COMMON_QUESTIONS, omitCommon, pickCommon } from '../questions'
 
-// As perguntas abertas recorrentes em formulários de vaga (mapeadas no apply-engine).
-// Viram o banco de respostas reutilizáveis (open_answers.qa), consultado pelo agente.
-const COMMON_QUESTIONS = [
-  'Tell us about yourself',
-  'Why do you want to work at this company?',
-  'Why are you a good fit for this role?',
-  'What are you looking for in your next role?',
-  'Describe a project you are proud of',
-  'What is your greatest strength?',
-  'Are you willing to relocate?',
-  'When can you start? / notice period',
-  'Anything else you would like us to know?'
-]
-const isCommon = (k: string): boolean => COMMON_QUESTIONS.includes(k)
-const omitCommon = (qa: Record<string, string>): Record<string, string> =>
-  Object.fromEntries(Object.entries(qa || {}).filter(([k]) => !isCommon(k)))
-const pickCommon = (qa: Record<string, string>): Record<string, string> =>
-  Object.fromEntries(Object.entries(qa || {}).filter(([k]) => isCommon(k)))
+const clone = (o: any): any => JSON.parse(JSON.stringify(o))
 
 export default function Profile(props: { profile: any; onSave: (p: any) => Promise<void>; embedded?: boolean }): JSX.Element {
   const [p, setP] = React.useState<any>(() => clone(props.profile))
@@ -146,7 +129,7 @@ export default function Profile(props: { profile: any; onSave: (p: any) => Promi
       </Card>
 
       <Card title="Other questions" hint="Add any extra question/answer the common list doesn't cover.">
-        <KeyTextEditor label="Custom question → answer" value={omitCommon(g(['open_answers', 'qa'], {}))} onChange={(v) => set(['open_answers', 'qa'], { ...pickCommon(g(['open_answers', 'qa'], {})), ...v })} />
+        <KeyTextEditor label="Custom question → answer" value={omitCommon(g(['open_answers', 'qa'], {}))} onChange={(v) => set(['open_answers', 'qa'], { ...pickCommon(g(['open_answers', 'qa'], {})), ...omitCommon(v) })} />
         <TextArea label="Free notes (answers.md) — long-form context the agent can draw from" value={answers} onChange={(v) => { setAnswers(v); setSaved(false) }} rows={8} />
       </Card>
 
