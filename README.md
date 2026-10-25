@@ -12,13 +12,18 @@ Aplica app is the friendly front-end for the **[aplica](https://github.com/euraf
 
 ## What you get
 
-- **Início** — prerequisite checks (Python, `claude` CLI, engine, config/profile, résumé), a Claude in Chrome setup reminder, résumé/photo picker, one-click database init, and the disclaimer.
-- **Meus dados** — a full form for your real data (identity, links, work authorization, salary by modality, experience, years-per-tech, languages, education, open answers). Writes `profile.json`.
-- **Preferências de vaga** — exactly which role you want: titles, stack, geography, language, work modes, sources. Writes `config.json → target`.
-- **Comportamento** — every toggle (comment, connect, DM, like, "I'm interested", email résumé, SSO, create account) plus daily caps and cadence. Social defaults off.
-- **Agenda** — times for each routine, saved to your config. Run `/aplica-schedule` in Claude Code to turn them into real scheduled tasks (the app saves the schedule; the plugin command creates the tasks).
-- **Painel** — today's applications, stuck jobs and to-dos, read live from your local database.
-- **Executar** — run a round now via `claude -p`, with live output.
+- **Home** — prerequisite checks with one-click install helpers (Python, Claude Code CLI), Claude in Chrome detection + install button, résumé/photo picker, and the disclaimer. The local database is created automatically on first launch (bundled engine, isolated per app — it never points at an existing DB on your machine).
+- **Settings** (one modal, all config):
+  - *Your data* — your real data (identity, links, work authorization, salary by modality, experience, years-per-tech, languages, education) plus the common application questions answered in your own voice. Writes `profile.json` / `answers.md`.
+  - *Job preferences* — titles, stack, geography, company blocklist, language, work modes, sources. Writes `config.json → target`.
+  - *Behavior* — every toggle (comment, connect, DM, like, "I'm interested", email résumé/summary, SSO, create account) plus daily caps, cadence and active hours. Social defaults off.
+  - *Schedule* — times for each routine; run `/aplica-schedule` in Claude Code to turn them into real scheduled tasks.
+- **Dashboard** — applications, response rate by source, follow-ups, stuck jobs and to-dos, read live from your local database.
+- **Run** — run a round now via `claude -p`, autonomous, with live output and a Stop button.
+
+## Windows SmartScreen ("unknown publisher")
+
+The installer isn't code-signed yet, so Windows Defender SmartScreen shows *"Windows protected your PC / unknown publisher"*. This is expected for a new, unsigned app — it's not a virus warning. Click **More info → Run anyway** to install. (Removing the prompt permanently requires a paid code-signing certificate; that's on the roadmap.)
 
 ## Requirements
 

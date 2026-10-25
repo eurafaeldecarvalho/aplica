@@ -28,9 +28,16 @@ if (typeof window !== 'undefined' && !(window as any).aplica) {
     dbStuck: async () => ({ travadas: '(nenhuma)', pendencias: '#1\tCompletar perfil na Gupy' }),
     dbMetrics: async () => ok({ stdout: '# Métricas — 24 candidaturas (exclui incertas)\nTaxa de resposta: 29% (7) | Taxa de entrevista: 12% (3)\n\nfonte\tcandidaturas\trespostas\ttaxa_resp\tentrevistas\ttaxa_entr\nLinkedIn\t14\t5\t36%\t2\t14%\nATS\t7\t2\t29%\t1\t14%\nRemotive\t3\t0\t0%\t0\t0%' }),
     dbFollowups: async () => ok({ stdout: 'id\tdata\tempresa\ttitulo\tstatus\n8\t2026-10-10\tGlobex\tBackend Engineer\taplicada' }),
+    listNotifications: async () => ([
+      { level: 'error', title: 'LinkedIn needs your attention', detail: 'BLOQUEADO desde 2026-10-24 — verify in Chrome' },
+      { level: 'warn', title: 'Needs you', detail: 'Complete profile on Gupy', action: 'dashboard' },
+      { level: 'info', title: 'Run: ats-boards', detail: '5 applications — sources: Greenhouse, Ashby' }
+    ]),
     dbBackup: async () => ok({ stdout: 'OK backup (mock)' }),
     pickFile: async () => ({ ok: true, dest: '~/.config/aplica/resume.pdf' }),
     openConfigDir: async () => ({ ok: true }),
+    openExternal: async () => ({ ok: true }),
+    detectChrome: async () => ({ chromeFound: true, extFound: false }),
     runRoutine: async () => ({ ok: true, code: 0 }),
     stopRoutine: async () => ({ ok: true }),
     isRunning: async () => ({ running: false }),

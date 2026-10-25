@@ -1,5 +1,6 @@
 import React from 'react'
 import { Card } from '../ui'
+import { Icon } from '../icons'
 
 export default function Dashboard(): JSX.Element {
   const [report, setReport] = React.useState('')
@@ -14,7 +15,7 @@ export default function Dashboard(): JSX.Element {
     setLoading(true); setErr('')
     const check = await window.aplica.dbCheck()
     if (!(check.stdout || '').trim().endsWith('OK')) {
-      setErr('Banco não inicializado. Vá em Início → Inicializar banco.')
+      setErr('Database not initialized. Go to Home → Initialize database.')
       setLoading(false); return
     }
     const [r, t, s, m, f] = await Promise.all([
@@ -39,36 +40,36 @@ export default function Dashboard(): JSX.Element {
   return (
     <>
       <div className="page-head">
-        <h2>Painel</h2>
-        <p>Estado do seu banco local — candidaturas, travadas e o que precisa de você.</p>
+        <h2>Dashboard</h2>
+        <p>Your local database — applications, response rate, stuck jobs and what needs you.</p>
       </div>
 
-      <div className="btn-row" style={{ marginBottom: 16 }}>
-        <button className="btn secondary" onClick={load} disabled={loading}>{loading ? 'Carregando…' : 'Atualizar'}</button>
-        <span className="badge">Candidaturas hoje: {countToday()}</span>
+      <div className="btn-row" style={{ marginBottom: 18 }}>
+        <button className="btn secondary" onClick={load} disabled={loading}><Icon.refresh size={14} />{loading ? 'Loading…' : 'Refresh'}</button>
+        <span className="badge">Applications today: {countToday()}</span>
       </div>
 
-      {err && <div className="banner warn">{err}</div>}
+      {err && <div className="banner warn"><Icon.alert /><div>{err}</div></div>}
 
-      <Card title="Métricas — taxa de resposta por fonte">
-        <pre className="console">{metrics || '(sem dados)'}</pre>
+      <Card title="Response rate by source">
+        <pre className="console">{metrics || '(no data)'}</pre>
       </Card>
 
-      <Card title="Resumo do dia">
-        <pre className="console">{report || '(sem dados)'}</pre>
+      <Card title="Today's summary">
+        <pre className="console">{report || '(no data)'}</pre>
       </Card>
 
-      <Card title="Follow-ups sugeridos (sem retorno há 7+ dias)">
-        <pre className="console">{followups || '(nenhum)'}</pre>
+      <Card title="Suggested follow-ups (no reply for 7+ days)">
+        <pre className="console">{followups || '(none)'}</pre>
       </Card>
 
       {stuck && (
         <div className="grid">
-          <Card title="Vagas travadas (você termina na mão)">
-            <pre className="console">{stuck.travadas || '(nenhuma)'}</pre>
+          <Card title="Stuck jobs (you finish by hand)">
+            <pre className="console">{stuck.travadas || '(none)'}</pre>
           </Card>
-          <Card title="Precisa de você">
-            <pre className="console">{stuck.pendencias || '(nenhuma)'}</pre>
+          <Card title="Needs you">
+            <pre className="console">{stuck.pendencias || '(none)'}</pre>
           </Card>
         </div>
       )}

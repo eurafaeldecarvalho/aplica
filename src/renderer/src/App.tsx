@@ -1,29 +1,41 @@
 import React from 'react'
 import Onboarding from './tabs/Onboarding'
-import Profile from './tabs/Profile'
-import Target from './tabs/Target'
-import Behavior from './tabs/Behavior'
-import Schedule from './tabs/Schedule'
 import Dashboard from './tabs/Dashboard'
 import Run from './tabs/Run'
+import Notifications, { type Notif } from './tabs/Notifications'
+import SettingsModal from './SettingsModal'
+import { Logo, Icon } from './icons'
 
-type TabId = 'onboarding' | 'profile' | 'target' | 'behavior' | 'schedule' | 'dashboard' | 'run'
+type TabId = 'home' | 'dashboard' | 'run' | 'notifications'
 
-const TABS: { id: TabId; label: string; ico: string }[] = [
-  { id: 'onboarding', label: 'Início', ico: '◆' },
-  { id: 'profile', label: 'Meus dados', ico: '●' },
-  { id: 'target', label: 'Preferências de vaga', ico: '◎' },
-  { id: 'behavior', label: 'Comportamento', ico: '◈' },
-  { id: 'schedule', label: 'Agenda', ico: '◷' },
-  { id: 'dashboard', label: 'Painel', ico: '▦' },
-  { id: 'run', label: 'Executar', ico: '▶' }
+const TABS: { id: TabId; label: string; icon: () => JSX.Element }[] = [
+  { id: 'home', label: 'Home', icon: Icon.home },
+  { id: 'dashboard', label: 'Dashboard', icon: Icon.grid },
+  { id: 'run', label: 'Run', icon: Icon.play },
+  { id: 'notifications', label: 'Notifications', icon: Icon.alert }
 ]
 
 export default function App(): JSX.Element {
-  const [tab, setTab] = React.useState<TabId>('onboarding')
+  const [tab, setTab] = React.useState<TabId>('home')
   const [config, setConfig] = React.useState<any | null>(null)
   const [profile, setProfile] = React.useState<any | null>(null)
   const [configDir, setConfigDir] = React.useState('')
+  const [settingsOpen, setSettingsOpen] = React.useState(false)
+  const [settingsSection, setSettingsSection] = React.useState<string>('profile')
+  const [notifs, setNotifs] = React.useState<Notif[]>([])
+  const [notifsLoading, setNotifsLoading] = React.useState(false)
+
+  const loadNotifs = React.useCallback(async () => {
+    setNotifsLoading(true)
+    try { setNotifs(await window.aplica.listNotifications()) } catch { /* ignore */ }
+    setNotifsLoading(false)
+  }, [])
+  React.useEffect(() => {
+    loadNotifs()
+    const t = setInterval(loadNotifs, 60000)
+    return () => clearInterval(t)
+  }, [loadNotifs])
+  const alertCount = notifs.filter((n) => n.level === 'error' || n.level === 'warn').length
 
   const loadAll = React.useCallback(async () => {
     const [c, p, dir] = await Promise.all([
@@ -38,55 +50,66 @@ export default function App(): JSX.Element {
 
   React.useEffect(() => { loadAll() }, [loadAll])
 
-  const saveConfig = async (next: any): Promise<void> => {
-    setConfig(next)
-    await window.aplica.writeConfig(next)
-  }
-  const saveProfile = async (next: any): Promise<void> => {
-    setProfile(next)
-    await window.aplica.writeProfile(next)
-  }
+  const saveConfig = async (next: any): Promise<void> => { setConfig(next); await window.aplica.writeConfig(next) }
+  const saveProfile = async (next: any): Promise<void> => { setProfile(next); await window.aplica.writeProfile(next) }
+
+  const openSettings = (section = 'profile'): void => { setSettingsSection(section); setSettingsOpen(true) }
 
   if (!config || !profile) {
-    return <div className="app"><div className="content"><p className="muted">Carregando…</p></div></div>
+    return <div className="app"><div className="content"><div className="content-inner"><p className="muted">Loading…</p></div></div></div>
   }
 
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="logo">A</div>
+          <Logo size={32} />
           <div>
-            <h1>Aplica</h1>
-            <small>for Claude Code</small>
+            <div className="brand-name">Aplica</div>
+            <div className="brand-sub">for Claude Code</div>
           </div>
         </div>
+
         {TABS.map((t) => (
-          <div
-            key={t.id}
-            className={'nav-item' + (tab === t.id ? ' active' : '')}
-            onClick={() => setTab(t.id)}
-          >
-            <span className="ico">{t.ico}</span>
+          <div key={t.id} className={'nav-item' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>
+            <t.icon />
             <span>{t.label}</span>
+            {t.id === 'notifications' && alertCount > 0 && <span className="nav-count warn">{alertCount}</span>}
           </div>
         ))}
+
+        <div className="nav-label">Configuration</div>
+        <div className="nav-item" onClick={() => openSettings('profile')}>
+          <Icon.settings /><span>Settings</span>
+        </div>
+
         <div className="nav-spacer" />
         <div className="nav-foot">
-          {configDir ? `config: ${configDir}` : ''}
-          <br />v0.1.0 · MIT
+          {configDir && <>config dir<br /><code>{configDir}</code><br /></>}
+          v0.1.1 · MIT
         </div>
       </aside>
 
       <main className="content">
-        {tab === 'onboarding' && <Onboarding configDir={configDir} onReload={loadAll} />}
-        {tab === 'profile' && <Profile profile={profile} onSave={saveProfile} />}
-        {tab === 'target' && <Target config={config} onSave={saveConfig} />}
-        {tab === 'behavior' && <Behavior config={config} onSave={saveConfig} />}
-        {tab === 'schedule' && <Schedule config={config} onSave={saveConfig} />}
-        {tab === 'dashboard' && <Dashboard />}
-        {tab === 'run' && <Run config={config} />}
+        <div className="content-inner">
+          {tab === 'home' && <Onboarding configDir={configDir} config={config} profile={profile} onReload={loadAll} onOpenSettings={openSettings} />}
+          {tab === 'dashboard' && <Dashboard />}
+          {tab === 'run' && <Run config={config} onOpenSettings={() => openSettings('profile')} />}
+          {tab === 'notifications' && <Notifications items={notifs} loading={notifsLoading} onRefresh={loadNotifs} onGo={(t) => setTab(t as TabId)} />}
+        </div>
       </main>
+
+      {settingsOpen && (
+        <SettingsModal
+          config={config}
+          profile={profile}
+          section={settingsSection}
+          onSection={setSettingsSection}
+          onSaveConfig={saveConfig}
+          onSaveProfile={saveProfile}
+          onClose={() => { setSettingsOpen(false); loadAll() }}
+        />
+      )}
     </div>
   )
 }

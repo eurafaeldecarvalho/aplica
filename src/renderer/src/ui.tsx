@@ -95,7 +95,7 @@ export function TagInput(props: {
             </button>
           </span>
         ))}
-        {props.values.length === 0 && <span className="muted" style={{ fontSize: 12 }}>nenhum</span>}
+        {props.values.length === 0 && <span className="muted" style={{ fontSize: 12 }}>none</span>}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
@@ -107,18 +107,18 @@ export function TagInput(props: {
             if (e.key === 'Enter') { e.preventDefault(); add() }
           }}
         />
-        <button className="btn secondary" onClick={add}>Adicionar</button>
+        <button className="btn secondary" onClick={add}>Add</button>
       </div>
     </div>
   )
 }
 
-export function SaveBar(props: { onSave: () => void; saved: boolean; busy?: boolean; extra?: React.ReactNode }): JSX.Element {
+export function SaveBar(props: { onSave: () => void; saved: boolean; busy?: boolean; embedded?: boolean; extra?: React.ReactNode }): JSX.Element {
   return (
-    <div className="save-bar">
-      <button className="btn" onClick={props.onSave} disabled={props.busy}>Salvar</button>
+    <div className="save-bar" style={props.embedded ? { position: 'static', margin: '18px 0 0', padding: '16px 0 0', background: 'none', backdropFilter: 'none' } : undefined}>
+      <button className="btn" onClick={props.onSave} disabled={props.busy}>Save</button>
       {props.extra}
-      {props.saved && <span className="saved">✓ salvo</span>}
+      {props.saved && <span className="saved">✓ saved</span>}
     </div>
   )
 }

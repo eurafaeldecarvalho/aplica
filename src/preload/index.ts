@@ -21,10 +21,13 @@ const api = {
   dbMetrics: () => ipcRenderer.invoke('db:metrics'),
   dbFollowups: (dias?: number) => ipcRenderer.invoke('db:followups', dias),
   dbBackup: () => ipcRenderer.invoke('db:backup'),
+  listNotifications: () => ipcRenderer.invoke('notifications:list'),
 
   // files & shell
   pickFile: (kind: 'resume' | 'photo') => ipcRenderer.invoke('file:pick', kind),
   openConfigDir: () => ipcRenderer.invoke('open:configDir'),
+  openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
+  detectChrome: () => ipcRenderer.invoke('chrome:detect'),
 
   // routine run (stream)
   runRoutine: (source: string) => ipcRenderer.invoke('routine:run', source),

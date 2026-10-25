@@ -1,6 +1,6 @@
 {
   "name": "aplica-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aplica — desktop cockpit for the auto-apply job search plugin for Claude Code. Onboarding, your-data form, toggles, schedule and dashboard. Windows + Linux.",
   "author": "Rafael de Carvalho <rafaeldecarvalho.ps@gmail.com>",
   "license": "MIT",
@@ -16,7 +16,10 @@
     "dist:win": "electron-vite build && electron-builder --win",
     "dist:linux": "electron-vite build && electron-builder --linux"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.1.0",
+    "@fontsource-variable/hanken-grotesk": "^5.1.0"
+  },
   "devDependencies": {
     "@types/node": "20.14.9",
     "@types/react": "18.3.3",

@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, isAbsolute } from 'path'
+import { homedir } from 'os'
 import { promises as fs } from 'fs'
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import {
@@ -202,6 +203,52 @@ function registerIpc(): void {
   })
   ipcMain.handle('db:backup', async () => runEngine(['backup']))
 
+  // notificações agregadas dos sinais que o motor registra (login/bloqueio, pendências, runs)
+  ipcMain.handle('notifications:list', async () => {
+    const out: Array<{ level: string; title: string; detail: string; action?: string }> = []
+    const check = await runEngine(['check'])
+    if (!(check.stdout || '').trim().endsWith('OK')) {
+      return [{ level: 'warn', title: 'Database not initialized', detail: 'Open Home to initialize the local database.', action: 'home' }]
+    }
+    const motivoLabel: Record<string, string> = {
+      'linkedin-bloqueio': 'LinkedIn blocked or needs verification',
+      'sso-google-indisponivel': 'Google sign-in unavailable — check you are logged in to Chrome',
+      'email-nao-chegou': 'Verification email did not arrive',
+      'conta-ja-existe-senha-invalida': 'Account exists but sign-in failed',
+      '2fa-celular': '2FA on your phone required',
+      'captcha-persistente': 'CAPTCHA blocked',
+      'bloqueio-regional': 'Regional block',
+      'exige-documento': 'Document required',
+      'paywall-assinatura': 'Paywall / subscription'
+    }
+    const li = await runEngine(['linkedin-status'])
+    if ((li.stdout || '').trim().startsWith('BLOQUEADO')) {
+      out.push({ level: 'error', title: 'LinkedIn needs your attention', detail: li.stdout.trim() })
+    }
+    const sites = await runEngine(['sites-ativos'])
+    for (const line of (sites.stdout || '').split('\n')) {
+      const c = line.split('\t')
+      if (c.length >= 4 && c[2] === 'bloqueado') {
+        const label = motivoLabel[c[3]] || c[3]
+        out.push({ level: 'warn', title: `${c[1]}: ${label}`, detail: `last seen ${c[5] || ''} ${c[6] || ''}`.trim() })
+      }
+    }
+    const pend = await runEngine(['pendencia', 'list'])
+    for (const r of (pend.stdout || '').split('\n').filter((l) => /^\d+\t/.test(l))) {
+      const c = r.split('\t')
+      out.push({ level: 'warn', title: 'Needs you', detail: c[3] || r, action: 'dashboard' })
+    }
+    const trav = await runEngine(['travada', 'list'])
+    const trows = (trav.stdout || '').split('\n').filter((l) => /^\d+\t/.test(l))
+    if (trows.length) out.push({ level: 'info', title: `${trows.length} stuck job${trows.length > 1 ? 's' : ''}`, detail: 'Jobs you finish by hand — see the Dashboard.', action: 'dashboard' })
+    const logs = await runEngine(['logs'])
+    for (const r of (logs.stdout || '').split('\n').filter((l) => l.includes('\t')).slice(-6)) {
+      const c = r.split('\t')
+      if (c.length >= 3 && c[1] !== 'tipo') out.push({ level: 'info', title: `Run: ${c[1]}`, detail: c[2] })
+    }
+    return out
+  })
+
   // seleção de arquivo (currículo / foto) → copia pro config dir
   ipcMain.handle('file:pick', async (_e, kind: 'resume' | 'photo') => {
     const filters = kind === 'resume'
@@ -219,6 +266,62 @@ function registerIpc(): void {
     await ensureConfigDir()
     shell.openPath(configDir())
     return { ok: true }
+  })
+
+  // abre um link externo (só http/https) no navegador padrão
+  ipcMain.handle('open:external', async (_e, url: string) => {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+      await shell.openExternal(url)
+      return { ok: true }
+    }
+    return { ok: false }
+  })
+
+  // detecta (best-effort) a extensão Claude in Chrome lendo os perfis do Chrome
+  ipcMain.handle('chrome:detect', async () => {
+    const roots: string[] = []
+    if (process.platform === 'win32') {
+      const la = process.env.LOCALAPPDATA
+      if (la) roots.push(join(la, 'Google', 'Chrome', 'User Data'))
+    } else if (process.platform === 'darwin') {
+      roots.push(join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome'))
+    } else {
+      roots.push(join(homedir(), '.config', 'google-chrome'))
+      roots.push(join(homedir(), '.config', 'chromium'))
+    }
+    let chromeFound = false
+    let extFound = false
+    for (const root of roots) {
+      if (!fileExists(root)) continue
+      chromeFound = true
+      try {
+        const profiles = await fs.readdir(root, { withFileTypes: true })
+        for (const prof of profiles) {
+          if (!prof.isDirectory()) continue
+          const extDir = join(root, prof.name, 'Extensions')
+          if (!fileExists(extDir)) continue
+          const ids = await fs.readdir(extDir, { withFileTypes: true }).catch(() => [])
+          for (const id of ids) {
+            if (!id.isDirectory()) continue
+            const verDir = join(extDir, id.name)
+            const vers = await fs.readdir(verDir, { withFileTypes: true }).catch(() => [])
+            for (const v of vers) {
+              if (!v.isDirectory()) continue
+              const texts: string[] = []
+              for (const f of ['manifest.json', join('_locales', 'en', 'messages.json'), join('_locales', 'en_US', 'messages.json')]) {
+                try { texts.push(await fs.readFile(join(verDir, v.name, f), 'utf-8')) } catch { /* skip */ }
+              }
+              const blob = texts.join(' ').toLowerCase()
+              if (/"name"\s*:\s*"[^"]*claude|claude in chrome|anthropic/.test(blob)) { extFound = true }
+            }
+            if (extFound) break
+          }
+          if (extFound) break
+        }
+      } catch { /* ignore */ }
+      if (extFound) break
+    }
+    return { chromeFound, extFound }
   })
 
   // execução de rotina via claude -p (stream)
@@ -271,8 +374,21 @@ function registerIpc(): void {
   ipcMain.handle('routine:running', async () => ({ running: !!runningRoutine }))
 }
 
-app.whenReady().then(() => {
+/** Cria o banco local do app (motor empacotado) se ainda não existir. O DB é sempre o do app,
+ * isolado em APLICA_HOME; nunca aponta para um banco pré-existente na máquina do usuário. */
+async function ensureDatabase(): Promise<void> {
+  try {
+    await ensureConfigDir()
+    const dbPath = join(configDir(), 'state.db')
+    if (fileExists(dbPath)) return
+    if (!findPython()) return // sem Python o onboarding guia a instalação; init manual depois
+    await runEngine(['init'])
+  } catch { /* o onboarding mostra o estado do banco de qualquer forma */ }
+}
+
+app.whenReady().then(async () => {
   registerIpc()
+  await ensureDatabase()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
