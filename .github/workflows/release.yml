@@ -1,7 +1,7 @@
 name: release
 
-# Builda os instaladores (Windows NSIS + Linux AppImage/.deb) quando uma tag v* é publicada
-# e anexa os artefatos ao release correspondente.
+# Builds the installers (Windows NSIS + Linux AppImage/.deb) when a v* tag is pushed
+# and attaches the artifacts to the matching release.
 on:
   push:
     tags:

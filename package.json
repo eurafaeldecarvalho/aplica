@@ -1,8 +1,8 @@
 {
   "name": "aplica",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Aplica — desktop cockpit for the auto-apply job search plugin for Claude Code. Onboarding, your-data form, toggles, schedule and dashboard. Windows + Linux.",
-  "author": "Rafael de Carvalho <rafaeldecarvalho.ps@gmail.com>",
+  "author": "Rafael de Carvalho <eurafaeldecarvalho@users.noreply.github.com>",
   "license": "MIT",
   "homepage": "https://github.com/eurafaeldecarvalho/aplica",
   "main": "./out/main/index.js",
@@ -36,17 +36,42 @@
   "build": {
     "appId": "com.github.eurafaeldecarvalho.aplica",
     "productName": "Aplica",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["out/**/*", "package.json"],
-    "extraResources": [
-      { "from": "engine", "to": "engine", "filter": ["**/*", "!**/__pycache__/**"] }
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
     ],
-    "win": { "target": ["nsis"], "artifactName": "Aplica-Setup-${version}.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false },
+    "extraResources": [
+      {
+        "from": "engine",
+        "to": "engine",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Aplica-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Utility",
-      "maintainer": "Rafael de Carvalho <rafaeldecarvalho.ps@gmail.com>",
+      "maintainer": "Rafael de Carvalho <eurafaeldecarvalho@users.noreply.github.com>",
       "artifactName": "Aplica-${version}.${ext}"
     }
   }

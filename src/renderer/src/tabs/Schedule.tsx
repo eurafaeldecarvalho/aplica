@@ -21,7 +21,7 @@ export default function Schedule(props: { config: any; onSave: (c: any) => Promi
   const setEnabled = (k: string, v: boolean): void => { const n = clone(c); n.schedule = { ...(n.schedule || {}), [k]: { ...(n.schedule?.[k] || {}), enabled: v } }; setC(n); touch() }
   const setTimes = (k: string, times: string[]): void => { const n = clone(c); n.schedule = { ...(n.schedule || {}), [k]: { ...(n.schedule?.[k] || {}), times } }; setC(n); touch() }
 
-  // salva só a fatia desta seção (schedule) sobre o config mais recente.
+  // save only this section's slice (schedule) over the latest config.
   const save = async (): Promise<void> => {
     const n = clone(props.config); n.schedule = c.schedule
     await props.onSave(n); setC(n); setSaved(true); props.onDirty?.(false)

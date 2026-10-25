@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import './mock' // instala um mock de window.aplica só se o preload do Electron não existir
+import './mock' // installs a window.aplica mock only if the Electron preload is absent
 import App from './App'
 import './styles.css'
 

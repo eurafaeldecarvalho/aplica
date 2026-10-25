@@ -26,11 +26,14 @@ export default function Onboarding(props: {
   const [dbMsg, setDbMsg] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [chrome, setChrome] = React.useState<{ chromeFound: boolean; extFound: boolean } | null>(null)
+  const [plugin, setPlugin] = React.useState<{ ok: boolean; installed: boolean; reason?: string } | null>(null)
+  const [pluginMsg, setPluginMsg] = React.useState('')
 
   const refresh = React.useCallback(async () => { setPr(await window.aplica.checkPrereqs()) }, [])
   const recheckChrome = React.useCallback(async () => { setChrome(await window.aplica.detectChrome()) }, [])
-  React.useEffect(() => { refresh(); recheckChrome() }, [refresh, recheckChrome])
-  // re-checa os pré-requisitos quando config/profile mudam (ex.: após salvar no modal de Settings)
+  const recheckPlugin = React.useCallback(async () => { setPlugin(await window.aplica.checkPlugin()) }, [])
+  React.useEffect(() => { refresh(); recheckChrome(); recheckPlugin() }, [refresh, recheckChrome, recheckPlugin])
+  // re-check the prerequisites when config/profile change (e.g. after saving in the Settings modal)
   React.useEffect(() => { refresh() }, [props.config, props.profile, refresh])
 
   const initDb = async (): Promise<void> => {
@@ -43,6 +46,12 @@ export default function Onboarding(props: {
   }
   const pick = async (kind: 'resume' | 'photo'): Promise<void> => { await window.aplica.pickFile(kind); refresh() }
   const open = (url: string): void => { window.aplica.openExternal(url) }
+  const installPlugin = async (): Promise<void> => {
+    setBusy(true); setPluginMsg('Installing…')
+    const r = await window.aplica.installPlugin()
+    setPluginMsg((r.output || r.error || '').trim() || (r.ok ? 'Installed.' : 'Install failed.'))
+    setBusy(false); recheckPlugin()
+  }
 
   const prof = props.profile || {}
   const tgt = (props.config || {}).target || {}
@@ -157,6 +166,37 @@ export default function Onboarding(props: {
         <div className="btn-row" style={{ marginTop: 12 }}>
           <button className="btn secondary" onClick={recheckChrome}><Icon.refresh size={14} />Re-check</button>
           <button className="btn ghost" onClick={() => open(LINKS.extension)}><Icon.external size={14} />Setup guide</button>
+        </div>
+      </Card>
+
+      <Card title="Aplica plugin for Claude Code" hint="The engine that actually runs the job search. The app launches it via /aplica-run.">
+        <div className={'check-row ' + (plugin?.installed ? 'ok' : plugin && plugin.ok ? 'bad' : '')}>
+          <span className="ico-wrap">{plugin?.installed ? <Icon.check /> : <Icon.bolt />}</span>
+          <div className="grow">
+            <strong>
+              {plugin == null ? 'Checking…'
+                : plugin.installed ? 'Plugin installed'
+                : plugin.ok ? 'Plugin not installed'
+                : plugin.reason === 'no-claude' ? 'Install Claude Code first'
+                : 'Could not check (run the commands below)'}
+            </strong>
+            <small>
+              {plugin?.installed
+                ? 'The `aplica` plugin is available in Claude Code.'
+                : 'Install it so /aplica-run works. In Claude Code, or with the button below.'}
+            </small>
+          </div>
+          {plugin && !plugin.installed && pr?.claude && (
+            <button className="btn" onClick={installPlugin} disabled={busy}><Icon.download size={14} />Install plugin</button>
+          )}
+          <span className={'badge ' + (plugin?.installed ? 'ok' : 'warn')}>{plugin?.installed ? 'ready' : 'action'}</span>
+        </div>
+        {plugin && !plugin.installed && (
+          <pre className="console" style={{ marginTop: 12 }}>{`# in Claude Code:\n/plugin marketplace add eurafaeldecarvalho/aplica-claude-plugin\n/plugin install aplica`}</pre>
+        )}
+        {pluginMsg && <pre className="console" style={{ marginTop: 12 }}>{pluginMsg}</pre>}
+        <div className="btn-row" style={{ marginTop: 12 }}>
+          <button className="btn secondary" onClick={recheckPlugin}><Icon.refresh size={14} />Re-check</button>
         </div>
       </Card>
 

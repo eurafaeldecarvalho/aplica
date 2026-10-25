@@ -1,16 +1,21 @@
 import React from 'react'
 import Onboarding from './tabs/Onboarding'
 import Dashboard from './tabs/Dashboard'
+import Pipeline from './tabs/Pipeline'
+import Contacts from './tabs/Contacts'
 import Run from './tabs/Run'
 import Notifications, { type Notif } from './tabs/Notifications'
 import SettingsModal from './SettingsModal'
+import DraftModal from './DraftModal'
 import { Logo, Icon } from './icons'
 
-type TabId = 'home' | 'dashboard' | 'run' | 'notifications'
+type TabId = 'home' | 'dashboard' | 'pipeline' | 'contacts' | 'run' | 'notifications'
 
 const TABS: { id: TabId; label: string; icon: () => JSX.Element }[] = [
   { id: 'home', label: 'Home', icon: Icon.home },
   { id: 'dashboard', label: 'Dashboard', icon: Icon.grid },
+  { id: 'pipeline', label: 'Pipeline', icon: Icon.columns },
+  { id: 'contacts', label: 'Contacts', icon: Icon.user },
   { id: 'run', label: 'Run', icon: Icon.play },
   { id: 'notifications', label: 'Notifications', icon: Icon.alert }
 ]
@@ -24,10 +29,24 @@ export default function App(): JSX.Element {
   const [settingsSection, setSettingsSection] = React.useState<string>('profile')
   const [notifs, setNotifs] = React.useState<Notif[]>([])
   const [notifsLoading, setNotifsLoading] = React.useState(false)
+  const [draft, setDraft] = React.useState<{ kind: string; id: number; label: string } | null>(null)
+  const seenNotifs = React.useRef<Set<string> | null>(null)
 
   const loadNotifs = React.useCallback(async () => {
     setNotifsLoading(true)
-    try { setNotifs(await window.aplica.listNotifications()) } catch { /* ignore */ }
+    try {
+      const items: Notif[] = await window.aplica.listNotifications()
+      setNotifs(items)
+      // native desktop notification for newly-appeared alerts (not on the very first load)
+      const keyer = (n: Notif): string => `${n.level}|${n.title}|${n.detail}`
+      const alerts = items.filter((n: Notif) => n.level === 'error' || n.level === 'warn')
+      if (seenNotifs.current === null) {
+        seenNotifs.current = new Set(alerts.map(keyer))
+      } else {
+        const fresh = alerts.filter((n: Notif) => !seenNotifs.current!.has(keyer(n)))
+        if (fresh.length) { window.aplica.notifyDesktop?.(fresh); fresh.forEach((n: Notif) => seenNotifs.current!.add(keyer(n))) }
+      }
+    } catch { /* ignore */ }
     setNotifsLoading(false)
   }, [])
   React.useEffect(() => {
@@ -86,14 +105,16 @@ export default function App(): JSX.Element {
         <div className="nav-spacer" />
         <div className="nav-foot">
           {configDir && <>config dir<br /><code>{configDir}</code><br /></>}
-          v0.1.1 · MIT
+          v0.2.0 · MIT
         </div>
       </aside>
 
       <main className="content">
-        <div className="content-inner">
+        <div className={'content-inner' + (tab === 'pipeline' ? ' wide' : '')}>
           {tab === 'home' && <Onboarding configDir={configDir} config={config} profile={profile} onReload={loadAll} onOpenSettings={openSettings} />}
           {tab === 'dashboard' && <Dashboard />}
+          {tab === 'pipeline' && <Pipeline onGenerateDraft={(kind, id, label) => setDraft({ kind, id, label })} />}
+          {tab === 'contacts' && <Contacts />}
           {tab === 'run' && <Run config={config} onOpenSettings={() => openSettings('profile')} />}
           {tab === 'notifications' && <Notifications items={notifs} loading={notifsLoading} onRefresh={loadNotifs} onGo={(t) => setTab(t as TabId)} />}
         </div>
@@ -110,6 +131,8 @@ export default function App(): JSX.Element {
           onClose={() => { setSettingsOpen(false); loadAll() }}
         />
       )}
+
+      {draft && <DraftModal kind={draft.kind} applicationId={draft.id} label={draft.label} onClose={() => setDraft(null)} />}
     </div>
   )
 }

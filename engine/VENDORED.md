@@ -1,4 +1,5 @@
-# engine/ — vendorado
-Cópia do motor do plugin [aplica-claude-plugin](https://github.com/eurafaeldecarvalho/aplica-claude-plugin), empacotada no app
-para leituras locais do banco (`jobdb.py`). As execuções agênticas usam o plugin via `claude -p`.
-Mantenha em sincronia; `jobdb.py check` avisa se o `schema_version` do banco divergir do motor.
+# engine/ — vendored
+
+Copy of the [aplica-claude-plugin](https://github.com/eurafaeldecarvalho/aplica-claude-plugin) engine,
+bundled with the app for local database reads (`jobdb.py`). Agentic runs use the plugin via `claude -p`.
+Keep it in sync; `jobdb.py check` warns if the database `schema_version` drifts from the engine.

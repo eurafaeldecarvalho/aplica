@@ -11,13 +11,15 @@ export default function Behavior(props: { config: any; onSave: (c: any) => Promi
   const caps = c.caps || {}
   const touch = (): void => { setSaved(false); props.onDirty?.(true) }
 
+  const appCfg = c.app || {}
   const setB = (k: string, v: any): void => { const n = clone(c); n.behavior = { ...(n.behavior || {}), [k]: v }; setC(n); touch() }
   const setSocial = (k: string, v: boolean): void => { const n = clone(c); const base = n.behavior || (n.behavior = {}); base.social = { ...(base.social || {}), [k]: v }; setC(n); touch() }
   const setCap = (k: string, v: any): void => { const n = clone(c); n.caps = { ...(n.caps || {}), [k]: v }; setC(n); touch() }
+  const setApp = (k: string, v: any): void => { const n = clone(c); n.app = { ...(n.app || {}), [k]: v }; setC(n); touch() }
 
-  // salva só as fatias desta seção (behavior, caps) sobre o config mais recente.
+  // save only this section's slices (behavior, caps, app) over the latest config.
   const save = async (): Promise<void> => {
-    const n = clone(props.config); n.behavior = c.behavior; n.caps = c.caps
+    const n = clone(props.config); n.behavior = c.behavior; n.caps = c.caps; n.app = c.app
     await props.onSave(n); setC(n); setSaved(true); props.onDirty?.(false)
   }
   const socialOn = (b.social && (b.social.comment || b.social.connect || b.social.dm || b.social.like)) || b.feed_mode === 'full'
@@ -75,6 +77,10 @@ export default function Behavior(props: { config: any; onSave: (c: any) => Promi
           <Field label="Active hours — end (HH:MM, optional)" value={caps.active_hours?.end || ''} onChange={(v) => setCap('active_hours', { ...(caps.active_hours || {}), end: v })} />
         </div>
         <p className="hint" style={{ marginTop: 10, marginBottom: 0 }}>Empty active hours = no restriction. When set, the agent avoids acting outside that window (more human).</p>
+      </Card>
+
+      <Card title="Desktop app">
+        <Toggle label="Desktop notifications" desc="Show a native notification when a new block, stuck job or to-do needs you." checked={appCfg.desktop_notifications !== false} onChange={(v) => setApp('desktop_notifications', v)} />
       </Card>
 
       <SaveBar onSave={save} saved={saved} embedded={props.embedded} />

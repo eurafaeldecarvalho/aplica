@@ -21,8 +21,8 @@ export default function SettingsModal(props: {
   onSaveProfile: (p: any) => Promise<void>
   onClose: () => void
 }): JSX.Element {
-  // dirty por seção — as seções ficam montadas (não perdem edição ao trocar);
-  // avisa antes de fechar se houver mudança não salva.
+  // dirty per section — the sections stay mounted (no edit is lost when switching);
+  // warn before closing if there is an unsaved change.
   const [dirty, setDirty] = React.useState<Record<string, boolean>>({})
   const setSectionDirty = React.useCallback((id: string, v: boolean) => {
     setDirty((d) => (d[id] === v ? d : { ...d, [id]: v }))

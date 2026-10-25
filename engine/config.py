@@ -1,30 +1,32 @@
 #!/usr/bin/env python3
 """Config dir resolution and loading for Aplica — auto-apply for Claude Code.
 
-A instância de cada usuário vive FORA do repositório, num diretório de config do
-sistema operacional, para que nenhum dado pessoal ou credencial seja versionado:
+Each user's instance lives OUTSIDE the repository, in an OS config directory, so that no
+personal data or credential is ever versioned:
 
   Linux/mac : $APLICA_HOME  |  $XDG_CONFIG_HOME/aplica  |  ~/.config/aplica
   Windows   : %APLICA_HOME% |  %APPDATA%\\aplica
 
-Conteúdo do diretório (criado pelo app ou pelo setup-wizard):
-  config.json   settings/toggles/alvo/fontes/agenda (schema: config.schema.json)
-  profile.json  dados do candidato            (schema: profile.schema.json)
-  answers.md    respostas abertas longas
-  resume.pdf    currículo (anexado nas candidaturas)
-  photo.jpg     foto do candidato
-  state.db      estado (SQLite, via jobdb.py)
-  backups/      cópias do state.db
-  logs/ tmp/ visao/
+Directory contents (created by the app or by the setup-wizard):
+  config.json   settings/toggles/target/sources/schedule (schema: config.schema.json)
+  profile.json  candidate data                           (schema: profile.schema.json)
+  answers.md    long open-ended answers
+  resume.pdf    résumé (attached to applications; variants in config.resume_variants)
+  photo.jpg     candidate photo
+  state.db      state (SQLite, via jobdb.py)
+  backups/      state.db copies
+  drafts/       grounded drafts (cover letters, follow-ups, interview prep)
+  logs/ tmp/ views/
 """
 import json
 import os
+import re
 
 APP = "aplica"
 
 
 def home():
-    """Diretório de config do usuário. Cria se não existir."""
+    """User config directory. Created if missing."""
     env = os.environ.get("APLICA_HOME")
     if env:
         base = env
@@ -42,43 +44,46 @@ def path(*parts):
     return os.path.join(home(), *parts)
 
 
-# Caminhos usados pelo motor (um banco por instância; override por env p/ testes).
+# Paths used by the engine (one database per instance; env override for tests).
 DB = os.environ.get("APLICA_DB") or path("state.db")
 BACKUPS = path("backups")
 LOGS = path("logs")
 TMP = path("tmp")
-VISAO = path("visao")
+VIEWS = path("views")
+DRAFTS = path("drafts")
 
 
-# ---------- defaults (fazem o motor rodar mesmo com config parcial) ----------
-# Defaults CONSERVADORES por padrão (produto público): ações sociais desligadas,
-# tetos baixos. Cada usuário liga o que quiser no app / config.json.
+# ---------- defaults (let the engine run even with a partial config) ----------
+# CONSERVATIVE by default (public product): social actions off, low caps.
+# Each user turns on what they want in the app / config.json.
 DEFAULTS = {
     "schema_version": 1,
     "target": {
-        # termos de busca (o agente usa ao pesquisar nos boards/LinkedIn)
+        # search terms (the agent uses them when searching boards/LinkedIn)
         "titles_search": ["Software Engineer", "Backend Engineer", "Developer"],
-        # regex de título aceito / barrado (knockout por cargo)
+        # accepted / blocked title regex (title knockout)
         "title_ok": r"engineer|developer|desenvolvedor|engenheir",
         "title_bad": r"junior|j[uú]nior|jr\b|intern|est[aá]gi|trainee",
-        # stack-alvo e stacks fora (knockout por linguagem principal)
+        # target stack and out-of-scope stacks (main-language knockout)
         "stack_target": r"",
         "stack_out": {},
-        # geografia: listas de palavras; vazio em geo_allow = aceita qualquer local
+        # geography: word lists; empty geo_allow = accept any location
         "geo_allow": ["remote", "remoto", "worldwide", "anywhere", "global"],
         "geo_block": [],
-        # empresas/recrutadores a nunca aplicar (knockout por nome)
+        # companies/recruiters to never apply to (name knockout)
         "company_block": [],
-        # idioma de trabalho e bloqueio por idioma obrigatório
+        # working language and required-language block
         "work_language": ["english", "portuguese"],
         "language_required_block": r"",
-        # cidade do usuário (presencial/híbrido só vale aqui)
+        # user's city (on-site/hybrid only counts here)
         "home_city": "",
-        # modalidades aceitas
+        # accepted work modes
         "work_modes": {"remote": True, "hybrid": False, "onsite": False},
+        # ghost-job score (0-100) at or above which a posting is skipped
+        "ghost_max": 60,
     },
     "behavior": {
-        # feed do LinkedIn: full | apply_only | off  (OFF por padrão — maior risco de ban)
+        # LinkedIn feed: full | apply_only | off  (OFF by default — highest ban risk)
         "feed_mode": "off",
         "social": {"comment": False, "connect": False, "dm": False, "like": False},
         "im_interested": False,
@@ -96,7 +101,7 @@ DEFAULTS = {
         "interest_cooldown_days": 180,
         "post_interval_days": 7,
         "cadence_seconds": [45, 240],
-        # janela de horário humano (vazio = sem restrição); o agente evita agir fora dela
+        # human-hours window (empty = no restriction); the agent avoids acting outside it
         "active_hours": {"start": "", "end": ""},
     },
     "sources": {
@@ -105,6 +110,11 @@ DEFAULTS = {
     },
     "current_employer": [],
     "paths": {"resume": "resume.pdf", "photo": "photo.jpg"},
+    # résumé variants: [{"name", "file", "keywords"}] — keywords is a regex matched against the
+    # job title + description; the variant with the most hits wins, else paths.resume.
+    "resume_variants": [],
+    # desktop-app-only settings (the engine ignores them)
+    "app": {"desktop_notifications": True},
 }
 
 
@@ -112,7 +122,7 @@ def _deep_merge(base, over):
     out = dict(base)
     for k, v in (over or {}).items():
         if v is None:
-            # null no config do usuário nunca sobrescreve um default (mantém o valor conservador).
+            # null in the user's config never overrides a default (keeps the conservative value).
             continue
         if isinstance(v, dict) and isinstance(out.get(k), dict):
             out[k] = _deep_merge(out[k], v)
@@ -125,7 +135,7 @@ _CACHE = {}
 
 
 def load_config():
-    """config.json do usuário mesclado sobre os defaults. Cacheado por processo."""
+    """User config.json merged over the defaults. Cached per process."""
     if "config" in _CACHE:
         return _CACHE["config"]
     cfg = DEFAULTS
@@ -138,7 +148,7 @@ def load_config():
 
 
 def load_profile():
-    """profile.json do usuário (dados do candidato). {} se ainda não existir."""
+    """User profile.json (candidate data). {} if it does not exist yet."""
     p = path("profile.json")
     if not os.path.exists(p):
         return {}
@@ -146,19 +156,43 @@ def load_profile():
         return json.load(f)
 
 
-def resume_path():
-    rel = load_config()["paths"].get("resume", "resume.pdf")
+def _abs(rel):
     return rel if os.path.isabs(rel) else path(rel)
+
+
+def resume_path():
+    return _abs(load_config()["paths"].get("resume", "resume.pdf"))
 
 
 def photo_path():
-    rel = load_config()["paths"].get("photo", "photo.jpg")
-    return rel if os.path.isabs(rel) else path(rel)
+    return _abs(load_config()["paths"].get("photo", "photo.jpg"))
+
+
+def resume_for(title, text=""):
+    """(absolute path, variant name, hits) of the best résumé for a job.
+
+    Scores each configured variant by how many times its `keywords` regex matches the title
+    (weighted x3) and description. No variant with a hit → the default résumé (paths.resume).
+    A variant whose file is missing is skipped, so a run never attaches a non-existent file.
+    """
+    best = (resume_path(), "default", 0)
+    for v in load_config().get("resume_variants") or []:
+        kw, f = (v or {}).get("keywords") or "", (v or {}).get("file") or ""
+        if not kw or not f or not os.path.exists(_abs(f)):
+            continue
+        try:
+            rx = re.compile(kw, re.I)
+        except re.error:
+            continue
+        hits = 3 * len(rx.findall(title or "")) + len(rx.findall(text or ""))
+        if hits > best[2]:
+            best = (_abs(f), v.get("name") or os.path.basename(f), hits)
+    return best
 
 
 if __name__ == "__main__":
-    # Diagnóstico: `python config.py` mostra os caminhos resolvidos.
+    # Diagnostics: `python config.py` prints the resolved paths.
     print("home   :", home())
     print("db     :", DB)
-    print("config :", path("config.json"), "(existe)" if os.path.exists(path("config.json")) else "(ausente)")
-    print("profile:", path("profile.json"), "(existe)" if os.path.exists(path("profile.json")) else "(ausente)")
+    print("config :", path("config.json"), "(exists)" if os.path.exists(path("config.json")) else "(missing)")
+    print("profile:", path("profile.json"), "(exists)" if os.path.exists(path("profile.json")) else "(missing)")

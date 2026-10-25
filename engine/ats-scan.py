@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-# Aplica — varredura por API pública de ATS (Lever / Greenhouse / Ashby).
-# Lê as empresas de data/ats-empresas.txt e imprime vagas que passam nos knockouts do config
-# (filtros.py) e no dedup contra o state.db. Calcula FIT_SCORE 0-100 por vaga.
-# O agente só abre no navegador as vagas com fit alto (ordenadas desc).
+# Aplica — public ATS API scan (Lever / Greenhouse / Ashby).
+# Reads the companies from data/ats-companies.txt and prints jobs that pass the config knockouts
+# (filters.py), the ghost-job check and dedup against state.db. Computes a 0-100 FIT score per job.
+# The agent only opens high-fit jobs in the browser (sorted desc).
 #
-# Uso: python ats-scan.py [--min-fit 70]
-# Saída: ATS|empresa|titulo|local|url|fit=NN  (+ linha final de resumo)
+# Usage: python ats-scan.py [--min-fit 70]
+# Output: ATS|company|title|location|url|fit=NN|ghost=NN  (+ a final summary line)
 import json, urllib.request, sys, os, argparse, datetime, concurrent.futures as cf
-import jobdb, filtros
+import jobdb, filters
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-EMPRESAS = os.environ.get("APLICA_ATS_LIST") or os.path.join(HERE, "data", "ats-empresas.txt")
+COMPANIES = os.environ.get("APLICA_ATS_LIST") or os.path.join(HERE, "data", "ats-companies.txt")
 NOW = datetime.datetime.now(datetime.timezone.utc)
 
 
@@ -83,11 +83,11 @@ norm_url = jobdb.norm_url
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--min-fit", type=int, default=0, help="imprime só vagas com fit>=N (default 0 = todas)")
+    ap.add_argument("--min-fit", type=int, default=0, help="print only jobs with fit>=N (default 0 = all)")
     args = ap.parse_args()
 
     tasks = []
-    with open(EMPRESAS, encoding="utf-8") as f:
+    with open(COMPANIES, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#") or "|" not in line:
@@ -97,7 +97,8 @@ def main():
             if fn and slug.strip():
                 tasks.append((fn, slug.strip()))
 
-    applied = jobdb.urls_vistas(jobdb.conectar(somente_leitura=True))
+    con = jobdb.connect()
+    applied = jobdb.seen_urls(con)
 
     out, empty = [], []
     with cf.ThreadPoolExecutor(16) as ex:
@@ -106,30 +107,38 @@ def main():
                 empty.append(c)
                 continue
             for ats, comp, title, loc, url, age in res:
-                if filtros.titulo_passa(title) and filtros.empresa_passa(comp) and filtros.local_passa(loc):
+                if filters.title_ok(title) and filters.company_ok(comp) and filters.location_ok(loc):
                     out.append((ats, comp, title, loc, url, age))
 
-    seen, dedup_ledger, rows = set(), 0, []
+    seen, dedup_ledger, ghosts, rows = set(), 0, 0, []
     for ats, comp, title, loc, url, age in out:
         k = comp + "|" + title
         if k in seen:
             continue
         seen.add(k)
-        if url and norm_url(url) in applied:   # já aplicada (dedup por URL contra o banco)
+        jobdb.record_seen(con, comp, title, url)
+        if url and norm_url(url) in applied:   # already handled (URL dedup against the database)
             dedup_ledger += 1
             continue
-        rows.append((ats, comp, title, loc, url, filtros.nota_fit(title, loc, age)))
+        times, span = jobdb.seen_stats(con, comp, title)
+        ghost = filters.ghost_score(title=title, age_days=age, times_seen=times, seen_span_days=span)
+        if ghost >= filters.GHOST_MAX:
+            ghosts += 1
+            continue
+        rows.append((ats, comp, title, loc, url, filters.fit_score(title, loc, age), ghost))
+    con.commit()
 
     rows.sort(key=lambda r: -r[5])
     n_shown = 0
     n_fit70 = sum(1 for r in rows if r[5] >= 70)
-    for ats, comp, title, loc, url, fit in rows:
+    for ats, comp, title, loc, url, fit, ghost in rows:
         if fit < args.min_fit:
             continue
         n_shown += 1
-        print(f"{ats}|{comp}|{title}|{loc}|{url}|fit={fit}"[:240])
-    print(f"# MATCHES: {len(rows)} (mostradas: {n_shown}) | fit>=70: {n_fit70} | "
-          f"dedup (já no banco): {dedup_ledger} | boards vazios/erro: {','.join(empty) if empty else '(nenhum)'}")
+        print(f"{ats}|{comp}|{title}|{loc}|{url}|fit={fit}|ghost={ghost}"[:260])
+    print(f"# MATCHES: {len(rows)} (shown: {n_shown}) | fit>=70: {n_fit70} | "
+          f"dedup (already in db): {dedup_ledger} | ghost (>= {filters.GHOST_MAX}): {ghosts} | "
+          f"empty/error boards: {','.join(empty) if empty else '(none)'}")
 
 
 if __name__ == "__main__":

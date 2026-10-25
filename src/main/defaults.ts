@@ -1,5 +1,5 @@
-// Defaults de fábrica (espelham engine/config.py DEFAULTS). Conservadores: social OFF, tetos baixos.
-// Nenhum dado pessoal — tudo neutro, para o usuário preencher.
+// Factory defaults (mirror engine/config.py DEFAULTS). Conservative: social OFF, low caps.
+// No personal data — all neutral, for the user to fill in.
 
 export const DEFAULT_CONFIG = {
   schema_version: 1,
@@ -15,7 +15,8 @@ export const DEFAULT_CONFIG = {
     work_language: ['english', 'portuguese'],
     language_required_block: '',
     home_city: '',
-    work_modes: { remote: true, hybrid: false, onsite: false }
+    work_modes: { remote: true, hybrid: false, onsite: false },
+    ghost_max: 60
   },
   behavior: {
     feed_mode: 'off',
@@ -46,7 +47,9 @@ export const DEFAULT_CONFIG = {
     summary: { enabled: false, times: ['20:30'] }
   },
   current_employer: [],
-  paths: { resume: 'resume.pdf', photo: 'photo.jpg' }
+  paths: { resume: 'resume.pdf', photo: 'photo.jpg' },
+  resume_variants: [] as Array<{ name: string; file: string; keywords: string }>,
+  app: { desktop_notifications: true }
 }
 
 export const BLANK_PROFILE = {

@@ -46,5 +46,7 @@ export const Icon = {
   info: (p: P = {}) => S(p, <><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><circle cx="12" cy="8" r="0.7" fill="currentColor" /></>),
   chrome: (p: P = {}) => S(p, <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.4" /><path d="M12 8.6h8.4M8.9 13.8 4.7 6.6M15.1 13.8l-4.2 7.3" /></>),
   python: (p: P = {}) => S(p, <><rect x="5" y="4" width="14" height="16" rx="4" /><path d="M5 12h14" /><circle cx="9" cy="8" r="0.7" fill="currentColor" /><circle cx="15" cy="16" r="0.7" fill="currentColor" /></>),
-  bolt: (p: P = {}) => S(p, <path d="M13 2 4 14h7l-1 8 9-12h-7z" />)
+  bolt: (p: P = {}) => S(p, <path d="M13 2 4 14h7l-1 8 9-12h-7z" />),
+  columns: (p: P = {}) => S(p, <><rect x="3.5" y="4" width="5" height="16" rx="1.4" /><rect x="9.5" y="4" width="5" height="16" rx="1.4" /><rect x="15.5" y="4" width="5" height="16" rx="1.4" /></>),
+  file: (p: P = {}) => S(p, <><path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M13 3v5h5" /></>)
 }

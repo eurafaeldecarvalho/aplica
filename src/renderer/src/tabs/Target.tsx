@@ -13,10 +13,12 @@ export default function Target(props: { config: any; onSave: (c: any) => Promise
   const setMode = (k: string, v: boolean): void => { const n = clone(c); const base = n.target || (n.target = {}); base.work_modes = { ...(base.work_modes || {}), [k]: v }; setC(n); touch() }
   const setSource = (k: string, v: boolean): void => { const n = clone(c); n.sources = { ...(n.sources || {}), [k]: v }; setC(n); touch() }
 
-  // salva só as fatias desta seção (target, sources) sobre o config mais recente,
-  // para não reverter o que outra seção montada salvou nesta sessão do modal.
+  const setVariants = (v: any[]): void => { const n = clone(c); n.resume_variants = v; setC(n); touch() }
+
+  // save only this section's slices (target, sources, resume_variants) over the latest config,
+  // so it does not revert what another mounted section saved in this modal session.
   const save = async (): Promise<void> => {
-    const n = clone(props.config); n.target = c.target; n.sources = c.sources
+    const n = clone(props.config); n.target = c.target; n.sources = c.sources; n.resume_variants = c.resume_variants || []
     await props.onSave(n); setC(n); setSaved(true); props.onDirty?.(false)
   }
   const sourceLabels: Record<string, string> = { ats: 'ATS boards (Lever/Greenhouse/Ashby)', linkedin_jobs: 'LinkedIn Jobs', freehire: 'freehire aggregator', linkedin_feed: 'LinkedIn feed' }
@@ -54,6 +56,14 @@ export default function Target(props: { config: any; onSave: (c: any) => Promise
         <Toggle label="On-site" checked={t.work_modes?.onsite} onChange={(v) => setMode('onsite', v)} />
       </Card>
 
+      <Card title="Quality gate" hint="A posting scoring at or above this is treated as a ghost job (evergreen talent pool, stale re-post) and skipped. Lower = stricter. 0 disables it.">
+        <Field label="Ghost-job cutoff (0–100)" type="number" value={t.ghost_max ?? 60} onChange={(v) => setT('ghost_max', Math.max(0, Math.min(100, Number(v) || 0)))} />
+      </Card>
+
+      <Card title="Résumé variants" hint="Keep more than one résumé and the engine attaches the best keyword match per job, then reports the reply rate per variant. Place each file in your config dir.">
+        <ResumeVariants value={c.resume_variants || []} onChange={setVariants} />
+      </Card>
+
       <Card title="Sources" hint="Which searches the engine uses.">
         {Object.keys(c.sources || {}).map((k) => (
           <Toggle key={k} label={sourceLabels[k] || k} checked={c.sources[k]} onChange={(v) => setSource(k, v)} />
@@ -62,6 +72,29 @@ export default function Target(props: { config: any; onSave: (c: any) => Promise
 
       <SaveBar onSave={save} saved={saved} embedded={props.embedded} />
     </>
+  )
+}
+
+type Variant = { name: string; file: string; keywords: string }
+function ResumeVariants(props: { value: Variant[]; onChange: (v: Variant[]) => void }): JSX.Element {
+  const set = (i: number, k: keyof Variant, v: string): void => {
+    const n = props.value.map((x, j) => (j === i ? { ...x, [k]: v } : x)); props.onChange(n)
+  }
+  const add = (): void => props.onChange([...(props.value || []), { name: '', file: '', keywords: '' }])
+  const remove = (i: number): void => props.onChange(props.value.filter((_, j) => j !== i))
+  return (
+    <div className="field">
+      {(props.value || []).length === 0 && <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>No variants — the engine always attaches your default <code>resume.pdf</code>.</p>}
+      {(props.value || []).map((v, i) => (
+        <div key={i} className="variant-row">
+          <input placeholder="name (e.g. backend)" value={v.name} onChange={(e) => set(i, 'name', e.target.value)} />
+          <input placeholder="file (e.g. resume-backend.pdf)" value={v.file} onChange={(e) => set(i, 'file', e.target.value)} />
+          <input placeholder="keywords regex (e.g. node|typescript|backend)" value={v.keywords} onChange={(e) => set(i, 'keywords', e.target.value)} />
+          <button className="icon-btn" onClick={() => remove(i)} aria-label="remove variant">×</button>
+        </div>
+      ))}
+      <button className="btn secondary" onClick={add} style={{ marginTop: 6 }}>Add variant</button>
+    </div>
   )
 }
 

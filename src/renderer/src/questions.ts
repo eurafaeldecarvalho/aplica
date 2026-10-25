@@ -1,5 +1,5 @@
-// Perguntas abertas recorrentes em formulários de vaga (mapeadas no apply-engine).
-// Compartilhadas entre o editor (Profile) e o medidor de completude (Onboarding).
+// Recurring open-ended questions on job forms (mapped in apply-engine).
+// Shared between the editor (Profile) and the completeness meter (Onboarding).
 export const COMMON_QUESTIONS = [
   'Tell us about yourself',
   'Why do you want to work at this company?',

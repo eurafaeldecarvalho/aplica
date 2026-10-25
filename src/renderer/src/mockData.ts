@@ -1,4 +1,4 @@
-// Cópia leve dos defaults para o mock de preview do renderer (espelha main/defaults.ts).
+// Lightweight copy of the defaults for the renderer preview mock (mirrors main/defaults.ts).
 export const DEFAULT_CONFIG = {
   schema_version: 1,
   target: {
@@ -13,7 +13,8 @@ export const DEFAULT_CONFIG = {
     work_language: ['english', 'portuguese'],
     language_required_block: '',
     home_city: '',
-    work_modes: { remote: true, hybrid: false, onsite: false }
+    work_modes: { remote: true, hybrid: false, onsite: false },
+    ghost_max: 60
   },
   behavior: {
     feed_mode: 'off',
@@ -34,7 +35,9 @@ export const DEFAULT_CONFIG = {
     summary: { enabled: false, times: ['20:30'] }
   },
   current_employer: [],
-  paths: { resume: 'resume.pdf', photo: 'photo.jpg' }
+  paths: { resume: 'resume.pdf', photo: 'photo.jpg' },
+  resume_variants: [],
+  app: { desktop_notifications: true }
 }
 
 export const BLANK_PROFILE = {

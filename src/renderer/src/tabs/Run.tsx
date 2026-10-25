@@ -27,10 +27,12 @@ export default function Run(props: { config: any; onOpenSettings: () => void }):
     if (!pr.profilePresent) b.push('profile.json missing — fill Settings → Your data and Save')
     const chk: any = await window.aplica.dbCheck()
     if (!(chk.stdout || '').trim().endsWith('OK')) b.push('Database not initialized — Home → Initialize database')
+    const plg: any = await window.aplica.checkPlugin()
+    if (plg?.ok && !plg.installed) b.push('Aplica plugin not installed in Claude Code — Home → Install plugin')
     setBlockers(b)
   }, [])
 
-  // mount-only: assina a saída e sincroniza o estado "running" com o backend (recupera ao voltar à aba)
+  // mount-only: subscribe to output and sync the "running" state with the backend (recovers on tab return)
   React.useEffect(() => {
     window.aplica.isRunning().then((s: any) => setRunning(!!s?.running))
     const off = window.aplica.onRoutineOutput((chunk) => {
@@ -40,10 +42,10 @@ export default function Run(props: { config: any; onOpenSettings: () => void }):
     return off
   }, [])
 
-  // re-roda o preflight quando a configuração muda (ex.: após salvar no modal de Settings)
+  // re-run the preflight when the configuration changes (e.g. after saving in the Settings modal)
   React.useEffect(() => { preflight() }, [preflight, props.config])
 
-  // enquanto rodando, confere o backend para o botão se recuperar após remontagem/conclusão
+  // while running, poll the backend so the button recovers after a remount/finish
   React.useEffect(() => {
     if (!running) return
     const t = setInterval(async () => {
@@ -72,7 +74,10 @@ export default function Run(props: { config: any; onOpenSettings: () => void }):
 
       <div className="banner info">
         <Icon.info />
-        <div>A run uses the <strong>aplica</strong> plugin installed in Claude Code (<code>/aplica-run</code>) and the Claude in Chrome extension.</div>
+        <div>A run uses the <strong>aplica</strong> plugin installed in Claude Code (<code>/aplica-run</code>) and drives your logged-in
+        Chrome through the Claude in Chrome extension. For the browser to work, Claude Code must be signed in to <strong>claude.ai</strong> (not
+        an API key), and the extension connected. The app enables Chrome for the run automatically (<code>--chrome</code>); the first time a
+        job site opens, approve it in the extension if it asks.</div>
       </div>
 
       <div className="banner warn">

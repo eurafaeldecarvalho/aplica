@@ -13,14 +13,25 @@ const api = {
 
   // prereqs & db
   checkPrereqs: () => ipcRenderer.invoke('prereqs:check'),
+  checkPlugin: () => ipcRenderer.invoke('plugin:check'),
+  installPlugin: () => ipcRenderer.invoke('plugin:install'),
   dbInit: () => ipcRenderer.invoke('db:init'),
   dbCheck: () => ipcRenderer.invoke('db:check'),
   dbReport: (date?: string) => ipcRenderer.invoke('db:report', date),
   dbToday: (date?: string) => ipcRenderer.invoke('db:today', date),
   dbStuck: () => ipcRenderer.invoke('db:stuck'),
   dbMetrics: () => ipcRenderer.invoke('db:metrics'),
-  dbFollowups: (dias?: number) => ipcRenderer.invoke('db:followups', dias),
+  dbMetricsJson: () => ipcRenderer.invoke('db:metricsJson'),
+  dbFollowups: (days?: number) => ipcRenderer.invoke('db:followups', days),
   dbBackup: () => ipcRenderer.invoke('db:backup'),
+  dbApplications: () => ipcRenderer.invoke('db:applications'),
+  dbSetStatus: (id: number, status: string) => ipcRenderer.invoke('db:setStatus', id, status),
+  dbContacts: () => ipcRenderer.invoke('db:contacts'),
+  dbContactHistory: (person: string) => ipcRenderer.invoke('db:contactHistory', person),
+  dbDrafts: () => ipcRenderer.invoke('db:drafts'),
+  dbDraftMarkSent: (id: number) => ipcRenderer.invoke('db:draftMarkSent', id),
+  openDraft: (path: string) => ipcRenderer.invoke('draft:open', path),
+  notifyDesktop: (items: unknown) => ipcRenderer.invoke('notify:desktop', items),
   listNotifications: () => ipcRenderer.invoke('notifications:list'),
 
   // files & shell
@@ -38,6 +49,17 @@ const api = {
     ipcRenderer.on('routine:output', handler)
     return (): void => {
       ipcRenderer.removeListener('routine:output', handler)
+    }
+  },
+
+  // grounded draft generation (stream)
+  runDraft: (kind: string, applicationId: number) => ipcRenderer.invoke('draft:run', kind, applicationId),
+  isDraftRunning: () => ipcRenderer.invoke('draft:running'),
+  onDraftOutput: (cb: (chunk: string) => void) => {
+    const handler = (_e: unknown, chunk: string): void => cb(chunk)
+    ipcRenderer.on('draft:output', handler)
+    return (): void => {
+      ipcRenderer.removeListener('draft:output', handler)
     }
   }
 }

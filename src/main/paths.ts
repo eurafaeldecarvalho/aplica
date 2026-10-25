@@ -4,7 +4,7 @@ import { existsSync } from 'fs'
 import { homedir } from 'os'
 import { spawnSync } from 'child_process'
 
-/** Config dir do usuário (mesma lógica de engine/config.py). */
+/** The user's config dir (same logic as engine/config.py). */
 export function configDir(): string {
   const env = process.env.APLICA_HOME
   if (env) return env
@@ -25,7 +25,7 @@ export function answersFile(): string {
   return join(configDir(), 'answers.md')
 }
 
-/** Pasta engine/ (dev: ao lado do projeto; empacotado: em resources/engine). */
+/** engine/ folder (dev: next to the project; packaged: in resources/engine). */
 export function enginePath(): string {
   if (app.isPackaged) {
     return join(process.resourcesPath, 'engine')
@@ -38,7 +38,7 @@ export function jobdbScript(): string {
 }
 
 let cachedPython: string | null | undefined
-/** Acha um Python utilizável, testando candidatos. Cacheia. null = não achou. */
+/** Find a usable Python by trying candidates. Cached. null = not found. */
 export function findPython(): string | null {
   if (cachedPython !== undefined) return cachedPython
   const candidates = process.platform === 'win32'
@@ -52,7 +52,7 @@ export function findPython(): string | null {
         return c
       }
     } catch {
-      /* próximo */
+      /* next */
     }
   }
   cachedPython = null
@@ -60,7 +60,7 @@ export function findPython(): string | null {
 }
 
 let cachedClaude: string | null | undefined
-/** Acha o CLI `claude` no PATH. No Windows é um .cmd, que exige shell no spawn (senão EINVAL). */
+/** Find the `claude` CLI on PATH. On Windows it is a .cmd, which needs shell on spawn (else EINVAL). */
 export function findClaude(): string | null {
   if (cachedClaude !== undefined) return cachedClaude
   const win = process.platform === 'win32'
@@ -72,7 +72,7 @@ export function findClaude(): string | null {
         return c
       }
     } catch {
-      /* próximo */
+      /* next */
     }
   }
   cachedClaude = null

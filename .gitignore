@@ -6,5 +6,18 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
-# a instância do usuário fica no config dir do SO, nunca aqui
+
+# the user's instance lives in the OS config dir, never here — these are a safety net
 engine/**/__pycache__/
+config.json
+profile.json
+answers.md
+state.db
+*.db
+*.db-shm
+*.db-wal
+resume.pdf
+photo.*
+
+# TS build cache
+*.tsbuildinfo

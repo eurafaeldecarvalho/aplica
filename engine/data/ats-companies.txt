@@ -1,11 +1,11 @@
-# Lista de empresas para a varredura por API de ATS (fonte mais produtiva do agente).
-# Formato: uma linha por empresa -> ATS|slug
+# Companies for the public ATS API scan (the agent's most productive source).
+# Format: one line per company -> ATS|slug
 #   ATS = lever | greenhouse | ashby
-#   slug = identificador do board público (o que vem depois de /postings/, /boards/{slug}/jobs, /job-board/{slug})
-# O agente DEVE fazer crescer esta lista: toda vez que aplicar via um board novo, acrescentar o slug aqui.
-# Linhas começando com # são ignoradas.
+#   slug = public board identifier (what comes after /postings/, /boards/{slug}/jobs, /job-board/{slug})
+# The agent SHOULD grow this list: whenever it applies through a new board, add the slug here.
+# Lines starting with # are ignored.
 #
-# --- Confirmados (renderam candidatura em 2026-09-27) ---
+# --- Confirmed (produced applications on 2026-09-27) ---
 lever|bluelightconsulting
 greenhouse|engine
 greenhouse|nortal
@@ -18,10 +18,10 @@ ashby|railway
 ashby|phantom
 ashby|Silver
 #
-# --- Acrescentar novos slugs abaixo desta linha ---
+# --- Add new slugs below this line ---
 #
-# === Ampliação 2026-10-04 (slugs validados na API; o scanner filtra cargo/stack/geografia) ===
-# -- Com vaga no perfil-alvo no dia da validação --
+# === Expansion 2026-10-04 (slugs validated against the API; the scanner filters role/stack/geography) ===
+# -- Had a matching job on the validation day --
 greenhouse|coinbase
 greenhouse|twilio
 greenhouse|gitlab
@@ -50,7 +50,7 @@ ashby|circle
 ashby|sanity
 greenhouse|turing
 ashby|posthog
-# -- Board válido, sem match no dia (pode render em outros dias; o dedup evita retrabalho) --
+# -- Valid board, no match that day (may match on other days; dedup avoids rework) --
 ashby|sierra
 greenhouse|scaleai
 greenhouse|fivetran
