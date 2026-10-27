@@ -11,7 +11,7 @@ Aplica is a Claude Code plugin that runs your job hunt the way you would: it sca
 
 ![How an Aplica round works: finds roles, scores them, fills the form in your own Chrome, leaves risky steps to you; the pipeline board and reply rate per résumé](docs/demo.gif)
 
-<sub>App screens with sample data.</sub>
+<sub>App screens with sample data. More clips on the [project page](https://eurafaeldecarvalho.github.io/aplica/).</sub>
 
 > Prefer point-and-click? The **[desktop app](#desktop-app)** (Windows + Linux) in this same repo gives you onboarding, a data form, every toggle, a dashboard and a pipeline board. The app is the cockpit; the plugin is the engine; they share one config directory.
 
