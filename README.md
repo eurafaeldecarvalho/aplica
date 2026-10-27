@@ -9,6 +9,10 @@
 
 Aplica is a Claude Code plugin that runs your job hunt the way you would: it scans public job APIs, scores each role against **your** target profile, opens the good ones in **your own logged-in Chrome**, fills the forms with **your** real data, and applies — one application per role, deduplicated, at a human pace. Everything is customizable, and nothing about any other person is baked in: you provide the profile, the target, and the toggles.
 
+![How an Aplica round works: finds roles, scores them, fills the form in your own Chrome, leaves risky steps to you; the pipeline board and reply rate per résumé](docs/demo.gif)
+
+<sub>App screens with sample data.</sub>
+
 > Prefer point-and-click? The **[desktop app](#desktop-app)** (Windows + Linux) in this same repo gives you onboarding, a data form, every toggle, a dashboard and a pipeline board. The app is the cockpit; the plugin is the engine; they share one config directory.
 
 > ⚠️ **Read [`DISCLAIMER.md`](DISCLAIMER.md) first.** Job boards restrict automation in their Terms of Service and your account can be limited or banned. Social actions and high volume are the biggest triggers, so they are **off by default** and the daily caps are conservative. You run this on your own account, at your own risk.
