@@ -105,7 +105,7 @@ export default function App(): JSX.Element {
         <div className="nav-spacer" />
         <div className="nav-foot">
           {configDir && <>config dir<br /><code>{configDir}</code><br /></>}
-          v0.3.0 · MIT
+          v0.3.1 · MIT
         </div>
       </aside>
 

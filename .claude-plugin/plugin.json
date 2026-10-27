@@ -1,6 +1,6 @@
 {
   "name": "aplica",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Aplica — auto-apply for Claude Code. Agentic, config-driven job search that finds roles and applies in your own logged-in browser, with your own data, conservative anti-ban defaults, and everything customizable.",
   "author": {
     "name": "Rafael de Carvalho"
