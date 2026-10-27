@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aplica — applies to jobs in your own browser</title>
+<meta name="description" content="Free, open-source Claude Code plugin and desktop app that runs your job search in your own browser: it finds roles, scores them against your target, fills applications with your real data and leaves the risky steps to you.">
+<meta property="og:title" content="Aplica — applies to jobs in your own browser">
+<meta property="og:description" content="Finds roles, scores them against your target and fills the applications with your real data, at a human pace. Free and open source.">
+<meta property="og:image" content="https://eurafaeldecarvalho.github.io/aplica/media/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="nav-mark" href="#top">Aplica</a>
+  <nav class="nav-links" aria-label="Page">
+    <a href="#features">Features</a>
+    <a href="#never">Hands off</a>
+    <a href="#questions">Questions</a>
+    <a href="https://github.com/eurafaeldecarvalho/aplica">GitHub</a>
+  </nav>
+  <a class="nav-cta" data-download href="https://github.com/eurafaeldecarvalho/aplica/releases/latest">Download</a>
+</header>
+
+<main id="top">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <h1 id="hero-title">Applies to jobs in your own browser</h1>
+    <p class="lead">A Claude Code plugin and desktop app that finds roles, scores them against your target and fills the applications with your real data, at a human pace. Anything risky it leaves for you.</p>
+    <div class="hero-actions">
+      <a class="button" data-download href="https://github.com/eurafaeldecarvalho/aplica/releases/latest">Download Aplica</a>
+      <a class="link" href="https://github.com/eurafaeldecarvalho/aplica">View on GitHub</a>
+    </div>
+    <p class="note">Free and open source (MIT). Windows and Linux. Needs a paid Claude plan and the Claude in Chrome extension.</p>
+  </div>
+  <figure class="hero-media">
+    <div class="frame"><video src="media/f/pipeline.mp4" poster="media/f/pipeline.jpg" muted loop playsinline preload="metadata" data-auto width="1600" height="1000" aria-label="The Aplica pipeline: a card is dragged from Applied to Interview, then a cover letter is generated for another application"></video></div>
+    <figcaption>The pipeline: drag a card to change its status, then draft a cover letter from your profile. Sample data. <button type="button" class="pause" data-pause>Pause</button></figcaption>
+  </figure>
+</section>
+
+<section class="features" id="features" aria-labelledby="features-title">
+  <h2 id="features-title" class="h2">Set it up once, then let it work</h2>
+  <div class="feat-split">
+    <div class="feat-stage" aria-hidden="true">
+      <div class="frame">
+        <video src="media/f/profile.mp4" poster="media/f/profile.jpg" muted loop playsinline preload="none" data-stage="0" class="is-on"></video>
+        <video src="media/f/target.mp4" poster="media/f/target.jpg" muted loop playsinline preload="none" data-stage="1"></video>
+        <video src="media/f/behavior.mp4" poster="media/f/behavior.jpg" muted loop playsinline preload="none" data-stage="2"></video>
+        <video src="media/f/dashboard.mp4" poster="media/f/dashboard.jpg" muted loop playsinline preload="none" data-stage="3"></video>
+      </div>
+    </div>
+    <div class="feat-list">
+      <article class="feat" data-feat="0">
+        <div class="frame feat-media"><video src="media/f/profile.mp4" poster="media/f/profile.jpg" muted loop playsinline preload="none" aria-label="Filling name, email and phone in Aplica's Your data settings"></video></div>
+        <h3>Your data, typed once</h3>
+        <p>Name, contact, work authorization and the answers forms keep asking for. Aplica fills applications only from this profile, so nothing on a form is invented. It stays in a folder on your computer.</p>
+        <p class="small">In the clip: a sample profile filled in, then work authorization below it.</p>
+      </article>
+      <article class="feat" data-feat="1">
+        <div class="frame feat-media"><video src="media/f/target.mp4" poster="media/f/target.jpg" muted loop playsinline preload="none" aria-label="Adding Platform Engineer as a search term in Aplica's job preferences"></video></div>
+        <h3>Say what you're after</h3>
+        <p>Titles to search, the stack you want, the stacks that rule a job out, the markets you accept and the ones you don't. Every role found is scored against this before it gets a slot.</p>
+        <p class="small">In the clip: "Platform Engineer" added as a search term, then the stack and market filters.</p>
+      </article>
+      <article class="feat" data-feat="2">
+        <div class="frame feat-media"><video src="media/f/behavior.mp4" poster="media/f/behavior.jpg" muted loop playsinline preload="none" aria-label="Aplica's behavior settings: daily caps, cadence and active hours"></video></div>
+        <h3>Decide how hard it pushes</h3>
+        <p>Applications per day, batch size, seconds between actions and the hours it may work. Comments, connections and DMs, the biggest ban triggers, start switched off.</p>
+        <p class="small">In the clip: 15 applications a day, 45 to 240 seconds between actions.</p>
+      </article>
+      <article class="feat" data-feat="3">
+        <div class="frame feat-media"><video src="media/f/dashboard.mp4" poster="media/f/dashboard.jpg" muted loop playsinline preload="none" aria-label="Aplica's notifications: LinkedIn needs attention, a task that needs you, and the last run"></video></div>
+        <h3>It tells you where it stopped</h3>
+        <p>A blocked site, an expired sign-in, a form that wants a document upload: each lands in Notifications with what to do next, beside the result of the last run.</p>
+        <p class="small">In the clip: the dashboard, then Notifications with one block and one task for you.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="never" id="never" aria-labelledby="never-title">
+  <div class="never-copy">
+    <h2 id="never-title" class="h2">What it never does</h2>
+    <p>These are part of the plugin's rules. When a form needs one of them, the application goes to your "needs you" list to finish by hand.</p>
+  </div>
+  <ol class="never-list">
+    <li><b>Pay for anything</b><span>It never enters card or bank details.</span></li>
+    <li><b>Upload your documents</b><span>IDs, diplomas and other personal files stay with you.</span></li>
+    <li><b>Make up an answer</b><span>Forms, cover letters and follow-ups use your profile and the role's recorded facts only.</span></li>
+    <li><b>Change a password or accept an offer</b><span>Account and career decisions are yours.</span></li>
+    <li><b>Push through a CAPTCHA or a block</b><span>It stops at once and tells you.</span></li>
+  </ol>
+</section>
+
+<section class="questions" id="questions" aria-labelledby="questions-title">
+  <div class="q-index">
+    <h2 id="questions-title" class="q-head">Before you start</h2>
+    <ul class="q-list" role="tablist" aria-label="Questions" aria-orientation="vertical">
+      <li><button role="tab" aria-selected="true" aria-controls="ans" data-q="0">Is this allowed by LinkedIn and the job boards?</button></li>
+      <li><button role="tab" aria-selected="false" aria-controls="ans" data-q="1">Where does my data live?</button></li>
+      <li><button role="tab" aria-selected="false" aria-controls="ans" data-q="2">What do I need to run it?</button></li>
+      <li><button role="tab" aria-selected="false" aria-controls="ans" data-q="3">Does it work outside engineering?</button></li>
+      <li><button role="tab" aria-selected="false" aria-controls="ans" data-q="4">What does it cost?</button></li>
+    </ul>
+  </div>
+  <div class="q-pane" id="ans" role="tabpanel" aria-live="polite">
+    <p data-a="0">Their terms restrict automated access, and any automation can get an account limited. That is why social actions start off, caps are low, it uses your own account and IP at a human pace, and it stops on any CAPTCHA or block. Read DISCLAIMER.md and decide for yourself.</p>
+    <p data-a="1" hidden>Your profile, answers, résumés and the application database stay in your own config folder, never in the repo. What the agent reads to fill a form goes to Claude like any Claude Code session.</p>
+    <p data-a="2" hidden>A paid Claude plan (Pro, Max, Team or Enterprise), the Claude in Chrome extension with your accounts signed in, and Python 3.11 or later. The desktop app checks each one and installs the plugin for you.</p>
+    <p data-a="3" hidden>Yes. The target is plain config: titles, skills, locations, work modes and salary floor. The shipped example is a backend template; replace it with yours.</p>
+    <p data-a="4" hidden>Aplica is free and MIT-licensed. It runs on the Claude plan you already pay for.</p>
+  </div>
+</section>
+
+<section class="close" aria-labelledby="close-title">
+  <div class="close-copy">
+    <h2 id="close-title">Start your first round</h2>
+    <p>Install the app, fill in your profile once and press Run. Prefer the terminal? In Claude Code:</p>
+    <code class="cmd">/plugin install aplica --marketplace eurafaeldecarvalho/aplica</code>
+  </div>
+  <div class="dl">
+    <p class="dl-head">Latest release <span data-tag></span></p>
+    <a class="dl-row" data-asset="exe" href="https://github.com/eurafaeldecarvalho/aplica/releases/latest"><span>Windows</span><span>Installer .exe</span></a>
+    <a class="dl-row" data-asset="AppImage" href="https://github.com/eurafaeldecarvalho/aplica/releases/latest"><span>Linux</span><span>AppImage</span></a>
+    <a class="dl-row" data-asset="deb" href="https://github.com/eurafaeldecarvalho/aplica/releases/latest"><span>Debian, Ubuntu</span><span>.deb</span></a>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <span>Aplica · MIT · made by Rafael de Carvalho</span>
+  <span class="foot-links"><a href="https://github.com/eurafaeldecarvalho/aplica">GitHub</a><a href="https://github.com/eurafaeldecarvalho/aplica/releases">Releases</a><a href="https://github.com/eurafaeldecarvalho/aplica/blob/main/DISCLAIMER.md">Disclaimer</a><a href="https://github.com/eurafaeldecarvalho/aplica/issues">Issues</a></span>
+  <span>Clips recorded in the app with sample data</span>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
