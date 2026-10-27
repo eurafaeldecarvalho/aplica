@@ -1,6 +1,6 @@
 {
   "name": "aplica",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Aplica — desktop cockpit for the auto-apply job search plugin for Claude Code. Onboarding, your-data form, toggles, schedule and dashboard. Windows + Linux.",
   "author": "Rafael de Carvalho <eurafaeldecarvalho@users.noreply.github.com>",
   "license": "MIT",

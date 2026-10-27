@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Aplica — auto-apply for Claude Code.",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "plugins": [
     {
       "name": "aplica",
       "source": "./",
       "description": "Agentic, config-driven job search: finds roles and applies in your own logged-in browser, with your own data and conservative anti-ban defaults.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "license": "MIT",
       "keywords": [
         "jobs",
