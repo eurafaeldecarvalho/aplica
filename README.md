@@ -32,7 +32,10 @@ Aplica is a Claude Code plugin that runs your job hunt the way you would: it sca
 ## Install
 
 ```bash
-# in Claude Code
+# in Claude Code (2.1.275 or later), one step:
+/plugin install aplica --marketplace eurafaeldecarvalho/aplica
+
+# or, on older versions:
 /plugin marketplace add eurafaeldecarvalho/aplica
 /plugin install aplica
 ```
