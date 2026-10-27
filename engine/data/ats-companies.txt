@@ -1,0 +1,99 @@
+# Companies for the public ATS API scan (the agent's most productive source).
+# Format: one line per company -> ATS|slug
+#   ATS = lever | greenhouse | ashby
+#   slug = public board identifier (what comes after /postings/, /boards/{slug}/jobs, /job-board/{slug})
+# The agent SHOULD grow this list: whenever it applies through a new board, add the slug here.
+# Lines starting with # are ignored.
+#
+# --- Confirmed (produced applications on 2026-09-27) ---
+lever|bluelightconsulting
+greenhouse|engine
+greenhouse|nortal
+greenhouse|lumimeds
+greenhouse|wikimedia
+greenhouse|applytoaktos
+ashby|truelogic
+ashby|resend
+ashby|railway
+ashby|phantom
+ashby|Silver
+#
+# --- Add new slugs below this line ---
+#
+# === Expansion 2026-10-04 (slugs validated against the API; the scanner filters role/stack/geography) ===
+# -- Had a matching job on the validation day --
+greenhouse|coinbase
+greenhouse|twilio
+greenhouse|gitlab
+ashby|render
+ashby|temporal
+greenhouse|quintoandar
+greenhouse|mercury
+ashby|hopper
+greenhouse|stripe
+greenhouse|brex
+greenhouse|vtex
+lever|oowlish
+ashby|payabli
+ashby|close
+ashby|cursor
+greenhouse|gusto
+greenhouse|vercel
+greenhouse|gympass
+ashby|supabase
+ashby|runpod
+greenhouse|planetscale
+greenhouse|teravision
+ashby|openai
+ashby|elevenlabs
+ashby|circle
+ashby|sanity
+greenhouse|turing
+ashby|posthog
+# -- Valid board, no match that day (may match on other days; dedup avoids rework) --
+ashby|sierra
+greenhouse|scaleai
+greenhouse|fivetran
+ashby|ramp
+ashby|notion
+ashby|cohere
+ashby|plaid
+ashby|nubank
+ashby|baseten
+greenhouse|carta
+ashby|replit
+ashby|hostinger
+ashby|docker
+lever|dlocal
+ashby|modal
+greenhouse|ebanx
+lever|toptal
+greenhouse|thoughtworks
+ashby|workos
+ashby|linear
+ashby|stellar
+greenhouse|moduscreate
+greenhouse|wizeline
+lever|outreach
+greenhouse|contentful
+ashby|alchemy
+greenhouse|vonage
+ashby|substack
+ashby|andela
+ashby|paxos
+lever|neon
+ashby|airbyte
+ashby|zapier
+ashby|lemlist
+greenhouse|labelbox
+lever|kavak
+ashby|ledger
+lever|bluecoding
+greenhouse|netlify
+greenhouse|descope
+greenhouse|airtable
+greenhouse|knock
+greenhouse|remote
+ashby|clerk
+ashby|inngest
+ashby|hightouch

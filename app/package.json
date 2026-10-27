@@ -46,7 +46,7 @@
     ],
     "extraResources": [
       {
-        "from": "engine",
+        "from": "../engine",
         "to": "engine",
         "filter": [
           "**/*",

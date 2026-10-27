@@ -1,0 +1,36 @@
+# Aplica — never version user data or local artifacts.
+# The user's instance lives in the OS config dir (~/.config/aplica | %APPDATA%\aplica),
+# outside the repo. These patterns are a safety net in case someone copies data here.
+
+# user data / state
+config.json
+profile.json
+answers.md
+state.db
+state.db-shm
+state.db-wal
+*.db
+*.db-wal
+*.db-shm
+backups/
+logs/
+tmp/
+views/
+drafts/
+
+# résumé / photo / personal documents
+resume.pdf
+photo.*
+*.pdf
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

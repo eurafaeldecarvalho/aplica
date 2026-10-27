@@ -1,0 +1,27 @@
+{
+  "name": "aplica",
+  "owner": {
+    "name": "Rafael de Carvalho",
+    "url": "https://github.com/eurafaeldecarvalho"
+  },
+  "metadata": {
+    "description": "Aplica — auto-apply for Claude Code.",
+    "version": "0.2.0"
+  },
+  "plugins": [
+    {
+      "name": "aplica",
+      "source": "./",
+      "description": "Agentic, config-driven job search: finds roles and applies in your own logged-in browser, with your own data and conservative anti-ban defaults.",
+      "version": "0.2.0",
+      "license": "MIT",
+      "keywords": [
+        "jobs",
+        "job-search",
+        "auto-apply",
+        "automation",
+        "claude-code"
+      ]
+    }
+  ]
+}

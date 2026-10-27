@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/eurafaeldecarvalho/aplica/profile.schema.json",
+  "title": "Aplica profile.json",
+  "description": "Candidate data, filled in the app's 'Your data' tab. Never versioned. The engine reads it to fill application forms. Long open-ended answers can live in answers.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "identity": {
+      "type": "object",
+      "description": "Section 1 — identity.",
+      "properties": {
+        "full_name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone_e164": { "type": "string", "description": "Phone in E.164, e.g. +15555550123." },
+        "birth_date": { "type": "string" },
+        "national_id": { "type": "string", "description": "National ID, if the user chooses to store it (optional; avoid sensitive data in repos)." },
+        "nationality": { "type": "string" }
+      }
+    },
+    "address": {
+      "type": "object",
+      "description": "Section 2 — address.",
+      "properties": {
+        "line1": { "type": "string" }, "city": { "type": "string" },
+        "state": { "type": "string" }, "country": { "type": "string" }, "postal_code": { "type": "string" }
+      }
+    },
+    "links": {
+      "type": "object",
+      "description": "Section 3 — links.",
+      "properties": {
+        "linkedin": { "type": "string" }, "github": { "type": "string" },
+        "portfolio": { "type": "string" }, "other": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "work_authorization": {
+      "type": "object",
+      "description": "Section 4 — work authorization.",
+      "properties": {
+        "authorized_countries": { "type": "array", "items": { "type": "string" } },
+        "needs_sponsorship": { "type": "boolean" },
+        "disability": { "type": "string" },
+        "veteran": { "type": "string" },
+        "contact_current_employer": { "type": "boolean" }
+      }
+    },
+    "eeo": {
+      "type": "object",
+      "description": "Section 5 — self-identification (optional, never fabricate).",
+      "properties": {
+        "gender": { "type": "string" }, "pronouns": { "type": "string" },
+        "race": { "type": "string" }, "self_identification": { "type": "string" }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "description": "Section 6 — role, work model and salary.",
+      "properties": {
+        "headline": { "type": "string" },
+        "seniority": { "type": "string" },
+        "work_model": { "type": "string" },
+        "contract_types": { "type": "array", "items": { "type": "string" } },
+        "salary": {
+          "type": "object",
+          "description": "Expected pay per contract type (never blank, never lowball).",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "currency": { "type": "string" },
+              "period": { "enum": ["month", "year", "hour"] },
+              "min": { "type": "number" }, "mid": { "type": "number" }, "max": { "type": "number" }
+            }
+          }
+        },
+        "start_availability": { "type": "string" },
+        "notice_period": { "type": "string" }
+      }
+    },
+    "experience": {
+      "type": "object",
+      "description": "Section 7 — experience.",
+      "properties": {
+        "total_years": { "type": "number" },
+        "current_role": { "type": "string" },
+        "stacks": { "type": "array", "items": { "type": "string" } },
+        "bio": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Bios per language, e.g. {\"en\": \"...\", \"pt\": \"...\"}." },
+        "years_by_tech": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Years-per-technology matrix (do not round up)." }
+      }
+    },
+    "languages": {
+      "type": "array",
+      "description": "Section 8 — languages.",
+      "items": {
+        "type": "object",
+        "properties": { "language": { "type": "string" }, "level": { "type": "string" } }
+      }
+    },
+    "education": {
+      "type": "array",
+      "description": "Section 9 — education, courses, certifications (with credential id).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "enum": ["degree", "course", "certification"] },
+          "title": { "type": "string" }, "institution": { "type": "string" },
+          "year": { "type": "string" }, "status": { "type": "string" }, "credential_id": { "type": "string" }
+        }
+      }
+    },
+    "open_answers": {
+      "type": "object",
+      "description": "Section 10 — reusable open-ended answers (pitch, motivation, etc.) and writing style.",
+      "properties": {
+        "pitch": { "type": "string" },
+        "writing_style": { "type": "string", "description": "How to write on the user's behalf (language level, voice)." },
+        "qa": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "references": {
+      "type": "array",
+      "description": "Section 11 — references (never fabricate; empty if none).",
+      "items": { "type": "object", "properties": { "name": { "type": "string" }, "contact": { "type": "string" } } }
+    }
+  }
+}

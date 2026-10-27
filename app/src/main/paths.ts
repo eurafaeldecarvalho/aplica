@@ -25,12 +25,12 @@ export function answersFile(): string {
   return join(configDir(), 'answers.md')
 }
 
-/** engine/ folder (dev: next to the project; packaged: in resources/engine). */
+/** engine/ folder (dev: the plugin's engine at the repo root, one level up; packaged: in resources/engine). */
 export function enginePath(): string {
   if (app.isPackaged) {
     return join(process.resourcesPath, 'engine')
   }
-  return join(app.getAppPath(), 'engine')
+  return join(app.getAppPath(), '..', 'engine')
 }
 
 export function jobdbScript(): string {

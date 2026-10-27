@@ -2,13 +2,13 @@
 
 **The cockpit for Aplica — a point-and-click desktop app for the auto-apply job search plugin for Claude Code. Windows + Linux.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-31-47848F.svg)](https://www.electronjs.org/)
 [![platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux-blue.svg)](#install)
 
-Aplica app is the friendly front-end for the **[aplica-claude-plugin](https://github.com/eurafaeldecarvalho/aplica-claude-plugin)** plugin. It gives you onboarding, a form for your data, toggles for every behavior, a schedule, and a live dashboard — no terminal required. The plugin is the engine; this app is the cockpit. They share one config directory (`~/.config/aplica` / `%APPDATA%\aplica`); nothing personal is stored in either repo.
+Aplica app is the friendly front-end for the **[Aplica plugin](../README.md)** (the repo root). It gives you onboarding, a form for your data, toggles for every behavior, a schedule, and a live dashboard — no terminal required. The plugin is the engine; this app is the cockpit. They share one config directory (`~/.config/aplica` / `%APPDATA%\aplica`); nothing personal is stored in either repo.
 
-> ⚠️ Read [`DISCLAIMER.md`](DISCLAIMER.md). Job boards restrict automation and your account can be limited or banned. Social actions are **off by default**. You run this on your own account, at your own risk.
+> ⚠️ Read [`DISCLAIMER.md`](../DISCLAIMER.md). Job boards restrict automation and your account can be limited or banned. Social actions are **off by default**. You run this on your own account, at your own risk.
 
 ## What you get
 
@@ -32,7 +32,7 @@ The installer isn't code-signed yet, so Windows Defender SmartScreen shows *"Win
 
 - A **paid Claude plan** and the **Claude in Chrome** extension, with your accounts logged in.
 - **Python 3.11+** and the **Claude Code CLI** (`claude`) on your PATH.
-- The **[aplica-claude-plugin](https://github.com/eurafaeldecarvalho/aplica-claude-plugin)** plugin installed in Claude Code (`/plugin marketplace add eurafaeldecarvalho/aplica-claude-plugin` → `/plugin install aplica`).
+- The **[Aplica plugin](../README.md)** installed in Claude Code (`/plugin marketplace add eurafaeldecarvalho/aplica` → `/plugin install aplica`); the app offers to install it on first run.
 
 ## Install
 
@@ -49,7 +49,7 @@ npm run dev     # run in development
 npm run dist    # build installers for the current OS (dist/)
 ```
 
-The Python engine is vendored under `engine/` and bundled into the app for local database reads; the agentic runs use the installed `aplica` plugin via `claude -p --chrome`. Keep `engine/` in sync with the plugin repo.
+Run these inside `app/`. The app reads the plugin's Python engine from `../engine` in development and bundles it into the installer (`extraResources`), so there is a single copy of the engine in the repo.
 
 ## Support the project
 

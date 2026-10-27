@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "_comment": "'Backend Engineer (Node/TypeScript)' profile template. Copy it into your config dir as config.json and adjust. Social is OFF by default — turn it on at your own risk (see DISCLAIMER.md).",
+  "target": {
+    "titles_search": [
+      "Senior Backend Engineer",
+      "Backend Engineer",
+      "Node.js Developer",
+      "TypeScript Engineer",
+      "Mid-level Backend Engineer"
+    ],
+    "title_ok": "back.?end|node|typescript|full.?stack|software engineer|software developer|product engineer|desenvolvedor|developer|engenheir[oa] de software|nestjs",
+    "title_bad": "junior|j[uú]nior|jr\\b|intern|est[aá]gi|trainee|manager|director|diretor|head of|gerente|java\\b|\\.net|c#|golang|\\bgo\\b|ruby|rails|android|ios|mobile|flutter|react native|front.?end|data scien|cientista de dados|\\bqa\\b|sdet|test(er|ing)?\\b|devops|\\bsre\\b|salesforce|php|laravel|c\\+\\+|rust|elixir|scala|kotlin|machine learning|ml engineer|security|seguran[cç]a|sap\\b|abap|delphi|cobol|python developer|desenvolvedor python",
+    "stack_target": "node\\.?js|\\bnode\\b|typescript|nestjs|express|javascript",
+    "stack_out": {
+      "java": "\\bjava\\b(?!script)",
+      "go": "\\bgolang\\b|\\bgo\\b(?= |,|/)",
+      ".net": "\\.net\\b|c#",
+      "ruby": "\\bruby\\b|rails",
+      "php": "\\bphp\\b|laravel",
+      "python": "\\bpython\\b|django|fastapi"
+    },
+    "geo_allow": [
+      "remote", "remoto", "worldwide", "anywhere", "global",
+      "latam", "latin america", "americas", "south america", "brazil", "brasil",
+      "usa", "united states", "canada", "uk", "united kingdom", "ireland", "portugal"
+    ],
+    "geo_block": [
+      "india", "bangalore", "bengaluru", "hyderabad", "pune", "chennai",
+      "poland", "spain", "españa", "germany", "france", "czech", "prague",
+      "romania", "ukraine", "serbia", "philippines", "israel", "netherlands",
+      "sweden", "switzerland", "italy", "apac", "emea"
+    ],
+    "company_block": [],
+    "work_language": ["english", "portuguese"],
+    "language_required_block": "(spanish|español)\\s*(\\(|-|:)?\\s*(native|fluent|nativo|fluido|required|obligatorio|c1|c2)|fluent (in )?spanish|native spanish",
+    "home_city": "",
+    "work_modes": { "remote": true, "hybrid": false, "onsite": false },
+    "ghost_max": 60
+  },
+  "behavior": {
+    "feed_mode": "off",
+    "social": { "comment": false, "connect": false, "dm": false, "like": false },
+    "im_interested": false,
+    "email_resume": false,
+    "email_summary": false,
+    "sso_google": true,
+    "create_account": false
+  },
+  "caps": {
+    "applications_per_day": 15,
+    "max_batches": 10,
+    "batch_size": 5,
+    "social_per_day": 0,
+    "interest_per_day": 0,
+    "interest_cooldown_days": 180,
+    "post_interval_days": 7,
+    "cadence_seconds": [45, 240],
+    "active_hours": { "start": "", "end": "" }
+  },
+  "sources": {
+    "ats": true,
+    "linkedin_jobs": true,
+    "freehire": true,
+    "linkedin_feed": false
+  },
+  "schedule": {
+    "ats": { "enabled": false, "times": ["06:00"] },
+    "linkedin_jobs": { "enabled": false, "times": ["10:00"] },
+    "recruiters": { "enabled": false, "times": ["08:30", "16:30"] },
+    "feed": { "enabled": false, "times": ["09:15", "12:15", "15:15", "18:15"] },
+    "summary": { "enabled": false, "times": ["20:30"] }
+  },
+  "current_employer": [],
+  "paths": { "resume": "resume.pdf", "photo": "photo.jpg" },
+  "resume_variants": [],
+  "app": { "desktop_notifications": true }
+}

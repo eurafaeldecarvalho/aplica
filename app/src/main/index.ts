@@ -258,7 +258,7 @@ function registerIpc(): void {
 
   ipcMain.handle('plugin:install', async () => {
     if (!findClaude()) return { ok: false, error: 'claude CLI not found on PATH' }
-    const add = await runClaudeCli(['plugin', 'marketplace', 'add', 'eurafaeldecarvalho/aplica-claude-plugin'], 40000)
+    const add = await runClaudeCli(['plugin', 'marketplace', 'add', 'eurafaeldecarvalho/aplica'], 40000)
     const inst = await runClaudeCli(['plugin', 'install', 'aplica@aplica'], 40000)
     const out = [add.stdout, add.stderr, inst.stdout, inst.stderr].filter(Boolean).join('\n').trim()
     return { ok: inst.code === 0, output: out }

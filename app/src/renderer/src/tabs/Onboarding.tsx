@@ -192,7 +192,7 @@ export default function Onboarding(props: {
           <span className={'badge ' + (plugin?.installed ? 'ok' : 'warn')}>{plugin?.installed ? 'ready' : 'action'}</span>
         </div>
         {plugin && !plugin.installed && (
-          <pre className="console" style={{ marginTop: 12 }}>{`# in Claude Code:\n/plugin marketplace add eurafaeldecarvalho/aplica-claude-plugin\n/plugin install aplica`}</pre>
+          <pre className="console" style={{ marginTop: 12 }}>{`# in Claude Code:\n/plugin marketplace add eurafaeldecarvalho/aplica\n/plugin install aplica`}</pre>
         )}
         {pluginMsg && <pre className="console" style={{ marginTop: 12 }}>{pluginMsg}</pre>}
         <div className="btn-row" style={{ marginTop: 12 }}>
